@@ -1,10 +1,34 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+
+function mapAuthError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("email not confirmed")) {
+    return "E-posta dogrulamasini tamamlayin, sonra tekrar giris yapin.";
+  }
+
+  if (normalized.includes("invalid login credentials")) {
+    return "E-posta veya sifre hatali.";
+  }
+
+  if (normalized.includes("user already registered")) {
+    return "Bu e-posta adresi zaten kayitli.";
+  }
+
+  if (normalized.includes("signup is disabled")) {
+    return "Supabase tarafinda uye olma kapali. Auth ayarlarindan Email provider'i acin.";
+  }
+
+  return message;
+}
 
 export function AuthPanel() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -25,11 +49,13 @@ export function AuthPanel() {
 
     setBusy(false);
     if (error) {
-      setMessage(error.message);
+      setMessage(mapAuthError(error.message));
       return;
     }
 
-    setMessage("Giris basarili. Sayfayi yenileyin veya menuye donun.");
+    router.refresh();
+    setMessage("Giris basarili. Yonetim alanina yonlendiriliyorsunuz.");
+    window.location.href = "/paketler";
   };
 
   const onSignUp = async () => {
@@ -42,15 +68,33 @@ export function AuthPanel() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/giris`
+        : undefined;
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
 
     setBusy(false);
     if (error) {
-      setMessage(error.message);
+      setMessage(mapAuthError(error.message));
       return;
     }
 
-    setMessage("Uyelik istegi olusturuldu. E-posta dogrulamasini tamamlayin.");
+    if (data.session) {
+      router.refresh();
+      setMessage("Uyelik tamamlandi. Yonetim alanina yonlendiriliyorsunuz.");
+      window.location.href = "/paketler";
+      return;
+    }
+
+    setMessage("Uyelik istegi olusturuldu. E-posta dogrulamasini tamamlayin ve tekrar giris yapin.");
   };
 
   const onSignOut = async () => {
