@@ -39,7 +39,7 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: item.id }),
+        body: JSON.stringify({ packageId: item.id, packageSlug: item.slug }),
       });
 
       const data = await res.json();

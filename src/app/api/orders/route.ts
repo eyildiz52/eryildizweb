@@ -40,17 +40,38 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as { packageId?: string };
-  if (!body.packageId) {
-    return NextResponse.json({ error: "packageId zorunlu." }, { status: 400 });
+  const body = (await request.json()) as { packageId?: string; packageSlug?: string };
+  if (!body.packageId && !body.packageSlug) {
+    return NextResponse.json({ error: "packageId veya packageSlug zorunlu." }, { status: 400 });
   }
 
-  const { data: pkg, error: pkgError } = await admin
-    .from("software_packages")
-    .select("id,price,currency,package_type")
-    .eq("id", body.packageId)
-    .eq("is_active", true)
-    .maybeSingle();
+  let pkg: { id: string; price: number; currency: string; package_type: string } | null = null;
+  let pkgError: unknown = null;
+
+  if (body.packageId) {
+    const byId = await admin
+      .from("software_packages")
+      .select("id,price,currency,package_type")
+      .eq("id", body.packageId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    pkg = byId.data;
+    pkgError = byId.error;
+  }
+
+  // UI fallback data id'si ile DB id'si farkliysa slug ile ikinci deneme yap.
+  if (!pkg && body.packageSlug) {
+    const bySlug = await admin
+      .from("software_packages")
+      .select("id,price,currency,package_type")
+      .eq("slug", body.packageSlug)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    pkg = bySlug.data;
+    pkgError = bySlug.error;
+  }
 
   if (pkgError || !pkg) {
     return NextResponse.json({ error: "Paket bulunamadi." }, { status: 404 });
