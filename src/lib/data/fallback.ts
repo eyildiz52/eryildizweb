@@ -1,0 +1,68 @@
+import type { PlatformVideo, SoftwarePackage } from "../types";
+
+export const fallbackPackages: SoftwarePackage[] = [
+  {
+    id: "pkg-1",
+    slug: "crm-lite",
+    title: "CRM Lite",
+    short_description: "Kucuk ekipler icin hizli musteri takibi.",
+    long_description: "Teklif, gorev ve musteri notlarini tek panelde yonetirsiniz.",
+    package_type: "paid",
+    price: 1490,
+    currency: "TRY",
+    storage_bucket: "software-files",
+    storage_path: "paid/crm-lite.zip",
+    demo_url: null,
+    thumbnail_url: null,
+    is_active: true,
+  },
+  {
+    id: "pkg-2",
+    slug: "stok-mini",
+    title: "Stok Mini",
+    short_description: "Basit stok giris-cikis ve raporlama.",
+    long_description: "Kobi odakli stok takibi icin kolay kullanimli masaustu paket.",
+    package_type: "paid",
+    price: 990,
+    currency: "TRY",
+    storage_bucket: "software-files",
+    storage_path: "paid/stok-mini.zip",
+    demo_url: null,
+    thumbnail_url: null,
+    is_active: true,
+  },
+  {
+    id: "pkg-3",
+    slug: "on-muhasebe-demo",
+    title: "On Muhasebe Demo",
+    short_description: "Ucretsiz indirilebilir deneme surumu.",
+    long_description: "Fatura, cari ve kasa akislarini test etmek icin demo paket.",
+    package_type: "demo",
+    price: 0,
+    currency: "TRY",
+    storage_bucket: "software-files",
+    storage_path: "demo/on-muhasebe-demo.zip",
+    demo_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    thumbnail_url: null,
+    is_active: true,
+  },
+];
+
+export const fallbackVideos: PlatformVideo[] = [
+  {
+    id: "vid-1",
+    title: "CRM Lite 3 Dakikada",
+    summary: "Musteri karti, teklif ve gorev akislarini hizli tanitim videosu.",
+    video_url: "https://www.youtube.com/watch?v=ysz5S6PUM-U",
+    cover_url: null,
+    is_published: true,
+  },
+  {
+    id: "vid-2",
+    title: "Stok Mini Kurulum",
+    summary: "Kurulum ve ilk stok karti acilisi adim adim anlatim.",
+    video_url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    cover_url: null,
+    is_published: true,
+  },
+];
