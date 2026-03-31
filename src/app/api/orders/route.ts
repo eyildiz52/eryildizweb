@@ -8,6 +8,7 @@ import {
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
+  try {
   const supabase = await getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json(
@@ -137,4 +138,8 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, checkoutUrl: session.url });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Bilinmeyen sunucu hatasi";
+    return NextResponse.json({ error: `Odeme servisi hatasi: ${message}` }, { status: 500 });
+  }
 }

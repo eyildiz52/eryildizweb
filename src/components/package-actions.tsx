@@ -42,7 +42,10 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
         body: JSON.stringify({ packageId: item.id, packageSlug: item.slug }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") ?? "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: `Sunucu beklenmeyen bir yanit dondurdu. HTTP ${res.status}` };
 
       if (!res.ok) {
         setStatus(data.error ?? "Satin alma talebi olusturulamadi.");
