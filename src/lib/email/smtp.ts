@@ -16,8 +16,8 @@ function getSmtpConfig() {
   const secure = String(process.env.SMTP_SECURE ?? "false") === "true";
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const fromEmail = process.env.SMTP_FROM_EMAIL;
-  const inboxEmail = process.env.SALES_INBOX_EMAIL;
+  const fromEmail = process.env.SMTP_FROM_EMAIL ?? user;
+  const inboxEmail = process.env.SALES_INBOX_EMAIL ?? user;
 
   if (!host || !user || !pass || !fromEmail || !inboxEmail) {
     return null;

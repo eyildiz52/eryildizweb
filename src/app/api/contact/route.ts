@@ -66,8 +66,8 @@ export async function POST(request: Request) {
   await admin.from("email_logs").insert({
     channel: "smtp",
     event_type: "contact_request_notification",
-    recipient_email: process.env.SALES_INBOX_EMAIL ?? null,
-    sender_email: process.env.SMTP_FROM_EMAIL ?? null,
+    recipient_email: process.env.SALES_INBOX_EMAIL ?? process.env.SMTP_USER ?? null,
+    sender_email: process.env.SMTP_FROM_EMAIL ?? process.env.SMTP_USER ?? null,
     subject: `Yeni teklif talebi - ${fullName}`,
     status: emailResult.ok ? "sent" : "failed",
     provider_message_id: emailResult.messageId,

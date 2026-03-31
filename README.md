@@ -58,6 +58,7 @@ Bu proje yazilim paketleri satabileceginiz, demolari dagitabildiginiz, videolar 
 - Iletisim formu kaydi once `contact_requests` tablosuna yazilir.
 - Ardindan SMTP ile `SALES_INBOX_EMAIL` adresine otomatik bildirim e-postasi gonderilir.
 - Gonderim sonucu `email_logs` tablosuna `sent` veya `failed` olarak kaydedilir.
+- `SMTP_FROM_EMAIL` veya `SALES_INBOX_EMAIL` bos birakilsa bile sistem varsayilan olarak `SMTP_USER` adresini kullanir.
 - `supabase/schema.sql` dosyasini tekrar calistirarak `email_logs` tablosunu olusturun.
 
 ## Odeme Akisi (Stripe)
