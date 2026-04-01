@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const stripe = getStripeClient();
   if (!stripe) {
     return NextResponse.json(
-      { error: "Stripe SECRET key tanimli degil." },
+      { error: "Stripe SECRET key eksik veya formati hatali." },
       { status: 503 }
     );
   }

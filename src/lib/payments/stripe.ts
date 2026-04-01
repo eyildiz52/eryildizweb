@@ -1,6 +1,25 @@
 import Stripe from "stripe";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+function normalizeStripeSecretKey(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  // Vercel'e yapistirirken olusabilen satir sonu/tirnak gibi karakterleri temizle.
+  const cleaned = value.replace(/[\r\n]/g, "").trim().replace(/^['"]|['"]$/g, "");
+  if (!cleaned) {
+    return null;
+  }
+
+  // Stripe secret key formati: sk_test_... veya sk_live_...
+  if (!/^sk_(test|live)_/.test(cleaned)) {
+    return null;
+  }
+
+  return cleaned;
+}
+
+const stripeSecretKey = normalizeStripeSecretKey(process.env.STRIPE_SECRET_KEY);
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export function getStripeClient() {
