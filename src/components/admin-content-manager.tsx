@@ -374,8 +374,8 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       writeMessage("Yeni kullanici icin sifre zorunludur.");
       return;
     }
-    if (newUser.password.trim().length < 8) {
-      writeMessage("Sifre en az 8 karakter olmali.");
+    if (newUser.password.trim().length < 3) {
+      writeMessage("Sifre en az 3 karakter olmali.");
       return;
     }
 
@@ -712,7 +712,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                 value={newUser.password}
                 onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
                 className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
-                placeholder="Sifre * (en az 8 karakter)"
+                placeholder="Sifre * (en az 3 karakter)"
               />
             </div>
             <button

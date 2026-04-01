@@ -11,6 +11,8 @@ type UserPatchPayload = {
   password?: string;
 };
 
+const MIN_ADMIN_SET_PASSWORD_LENGTH = 3;
+
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
@@ -119,8 +121,11 @@ export async function PATCH(request: Request) {
 
   if (payload.password !== undefined) {
     const password = cleanText(payload.password);
-    if (!password || password.length < 8) {
-      return NextResponse.json({ error: "Yeni sifre en az 8 karakter olmali." }, { status: 400 });
+    if (!password || password.length < MIN_ADMIN_SET_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Yeni sifre en az ${MIN_ADMIN_SET_PASSWORD_LENGTH} karakter olmali.` },
+        { status: 400 }
+      );
     }
     passwordForAuth = password;
   }
@@ -202,8 +207,11 @@ export async function POST(request: Request) {
   }
 
   const password = cleanText(payload.password);
-  if (!password || password.length < 8) {
-    return NextResponse.json({ error: "Sifre en az 8 karakter olmali." }, { status: 400 });
+  if (!password || password.length < MIN_ADMIN_SET_PASSWORD_LENGTH) {
+    return NextResponse.json(
+      { error: `Sifre en az ${MIN_ADMIN_SET_PASSWORD_LENGTH} karakter olmali.` },
+      { status: 400 }
+    );
   }
 
   const role = cleanText(payload.role)?.toLowerCase() ?? "member";
@@ -211,20 +219,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "role sadece admin veya member olabilir." }, { status: 400 });
   }
 
-  const { data: authData, error: authError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+  let userId: string | null = null;
+
+  const { data: listedUsers, error: listUsersError } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
   });
 
-  if (authError) {
+  if (listUsersError) {
     return NextResponse.json(
-      { error: `Kullanici olusturulamadi: ${authError.message}` },
+      { error: `Kullanici listesi alinamadi: ${listUsersError.message}` },
       { status: 500 }
     );
   }
 
-  const userId = authData.user.id;
+  const existingAuthUser = (listedUsers.users ?? []).find(
+    (item) => (item.email ?? "").trim().toLowerCase() === email
+  );
+
+  if (existingAuthUser?.id) {
+    const { error: updateAuthError } = await admin.auth.admin.updateUserById(existingAuthUser.id, {
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (updateAuthError) {
+      return NextResponse.json(
+        { error: `Mevcut kullanici guncellenemedi: ${updateAuthError.message}` },
+        { status: 500 }
+      );
+    }
+
+    userId = existingAuthUser.id;
+  } else {
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (authError) {
+      return NextResponse.json(
+        { error: `Kullanici olusturulamadi: ${authError.message}` },
+        { status: 500 }
+      );
+    }
+
+    userId = authData.user.id;
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "Kullanici kimligi olusturulamadi." }, { status: 500 });
+  }
 
   await admin.from("profiles").upsert({
     id: userId,
