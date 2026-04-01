@@ -26,6 +26,10 @@ function mapAuthError(message: string) {
   return message;
 }
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export function AuthPanel() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -73,7 +77,14 @@ export function AuthPanel() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !normalizedEmail.includes("@")) {
+      setBusy(false);
+      setMessage("Gecerli bir e-posta girin.");
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
 
     setBusy(false);
     if (error) {
@@ -96,13 +107,20 @@ export function AuthPanel() {
       return;
     }
 
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !normalizedEmail.includes("@")) {
+      setBusy(false);
+      setMessage("Gecerli bir e-posta girin.");
+      return;
+    }
+
     const redirectUrl =
       typeof window !== "undefined"
         ? `${window.location.origin}/giris`
         : undefined;
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: redirectUrl,
@@ -148,7 +166,7 @@ export function AuthPanel() {
       return;
     }
 
-    const targetEmail = email.trim().toLowerCase();
+    const targetEmail = normalizeEmail(email);
     if (!targetEmail || !targetEmail.includes("@")) {
       setBusy(false);
       setMessage("Sifre sifirlama icin once e-posta girin.");
@@ -165,6 +183,38 @@ export function AuthPanel() {
     }
 
     setMessage("Sifre sifirlama baglantisi e-posta adresinize gonderildi.");
+  };
+
+  const onMagicLinkSignIn = async () => {
+    setBusy(true);
+    setMessage("");
+
+    if (!supabase) {
+      setBusy(false);
+      setMessage("Supabase ortam degiskenleri tanimli degil.");
+      return;
+    }
+
+    const targetEmail = normalizeEmail(email);
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setBusy(false);
+      setMessage("Baglanti gondermek icin once e-posta girin.");
+      return;
+    }
+
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/giris` : undefined;
+    const { error } = await supabase.auth.signInWithOtp({
+      email: targetEmail,
+      options: { emailRedirectTo: redirectTo },
+    });
+
+    setBusy(false);
+    if (error) {
+      setMessage(mapAuthError(error.message));
+      return;
+    }
+
+    setMessage("Giris baglantisi e-posta adresinize gonderildi.");
   };
 
   const onResetPassword = async () => {
@@ -283,6 +333,14 @@ export function AuthPanel() {
                 className="rounded-full border border-white/30 px-5 py-2 text-sm text-white/90 disabled:opacity-60"
               >
                 Sifremi Unuttum
+              </button>
+              <button
+                type="button"
+                onClick={onMagicLinkSignIn}
+                disabled={busy}
+                className="rounded-full border border-white/30 px-5 py-2 text-sm text-white/90 disabled:opacity-60"
+              >
+                E-posta Giris Linki Gonder
               </button>
             </>
           ) : (
