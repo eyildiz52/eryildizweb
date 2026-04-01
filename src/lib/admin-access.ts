@@ -2,7 +2,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 // Kalici admin e-postalar — DB ve env var'dan bagimsiz calisir
-const HARDCODED_ADMINS = ["erdoganyildiz52@gmail.com"];
+const HARDCODED_ADMINS = ["erdoganyildiz52@gmail.com", "erdogan.yildiz@eryildizyazilim.com"];
 
 function getConfiguredAdminEmails() {
   const fromEnv = (process.env.ADMIN_EMAILS ?? "")
