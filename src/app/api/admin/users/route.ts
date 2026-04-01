@@ -171,3 +171,79 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ ok: true, user: data });
 }
+
+export async function POST(request: Request) {
+  const access = await requireAdminAccess();
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Servis anahtari eksik." }, { status: 503 });
+  }
+
+  let payload: {
+    email?: string;
+    password?: string;
+    role?: string;
+    fullName?: string;
+    companyName?: string;
+  };
+  try {
+    payload = (await request.json()) as typeof payload;
+  } catch {
+    return NextResponse.json({ error: "Gecersiz JSON." }, { status: 400 });
+  }
+
+  const email = cleanText(payload.email)?.toLowerCase();
+  if (!email || !email.includes("@")) {
+    return NextResponse.json({ error: "Gecerli bir e-posta girin." }, { status: 400 });
+  }
+
+  const password = cleanText(payload.password);
+  if (!password || password.length < 8) {
+    return NextResponse.json({ error: "Sifre en az 8 karakter olmali." }, { status: 400 });
+  }
+
+  const role = cleanText(payload.role)?.toLowerCase() ?? "member";
+  if (!["admin", "member"].includes(role)) {
+    return NextResponse.json({ error: "role sadece admin veya member olabilir." }, { status: 400 });
+  }
+
+  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+
+  if (authError) {
+    return NextResponse.json(
+      { error: `Kullanici olusturulamadi: ${authError.message}` },
+      { status: 500 }
+    );
+  }
+
+  const userId = authData.user.id;
+
+  await admin.from("profiles").upsert({
+    id: userId,
+    email,
+    full_name: cleanOptionalText(payload.fullName) ?? null,
+    company_name: cleanOptionalText(payload.companyName) ?? null,
+    role,
+    updated_at: new Date().toISOString(),
+  });
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id,email,full_name,company_name,role,created_at,updated_at")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: "Kullanici bilgisi alinamadi." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, user: data }, { status: 201 });
+}

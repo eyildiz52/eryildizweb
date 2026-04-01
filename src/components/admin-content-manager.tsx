@@ -123,6 +123,14 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     cover_url: "",
     is_published: true,
   });
+  const [newUser, setNewUser] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    company_name: "",
+    role: "member" as "admin" | "member",
+  });
+  const [showNewUser, setShowNewUser] = useState(false);
   const [busyKey, setBusyKey] = useState<string>("");
   const [message, setMessage] = useState<string>("");
 
@@ -352,6 +360,50 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       writeMessage("Kullanici guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Kullanici guncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const createUser = async () => {
+    if (!newUser.email.trim()) {
+      writeMessage("E-posta zorunludur.");
+      return;
+    }
+    if (!newUser.password.trim()) {
+      writeMessage("Yeni kullanici icin sifre zorunludur.");
+      return;
+    }
+    if (newUser.password.trim().length < 8) {
+      writeMessage("Sifre en az 8 karakter olmali.");
+      return;
+    }
+
+    setBusyKey("new-user");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: newUser.email,
+          password: newUser.password,
+          role: newUser.role,
+          fullName: newUser.full_name || undefined,
+          companyName: newUser.company_name || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Kullanici olusturulamadi.");
+      }
+
+      await refreshUsers();
+      setNewUser({ email: "", password: "", full_name: "", company_name: "", role: "member" });
+      setShowNewUser(false);
+      writeMessage("Yeni kullanici olusturuldu.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Kullanici olusturulamadi.");
     } finally {
       setBusyKey("");
     }
@@ -615,7 +667,64 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
               Buradan rol degistirebilir, profil bilgilerini guncelleyebilir ve yeni sifre atayabilirsiniz.
             </p>
           </div>
+          <button
+            onClick={() => setShowNewUser((v) => !v)}
+            className="rounded-full border border-[#ffd166]/50 bg-[#ffd166]/10 px-4 py-1.5 text-xs font-semibold text-[#ffd166] hover:bg-[#ffd166]/20 transition-colors"
+          >
+            {showNewUser ? "Iptal" : "+ Yeni Kullanici"}
+          </button>
         </div>
+
+        {showNewUser && (
+          <article className="mt-4 rounded-xl border border-[#ffd166]/30 bg-[#ffd166]/5 p-4 space-y-3">
+            <p className="text-xs font-semibold text-[#ffd98a] tracking-widest">YENI KULLANICI</p>
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                value={newUser.email}
+                onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="E-posta *"
+                type="email"
+              />
+              <select
+                aria-label="Yeni kullanici rolu"
+                value={newUser.role}
+                onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value as "admin" | "member" }))}
+                className="rounded-lg border border-white/20 bg-[#0f1b2d] px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <input
+                value={newUser.full_name}
+                onChange={(e) => setNewUser((u) => ({ ...u, full_name: e.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Ad Soyad"
+              />
+              <input
+                value={newUser.company_name}
+                onChange={(e) => setNewUser((u) => ({ ...u, company_name: e.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Firma"
+              />
+              <input
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
+                className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Sifre * (en az 8 karakter)"
+              />
+            </div>
+            <button
+              onClick={createUser}
+              disabled={busyKey === "new-user"}
+              className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
+            >
+              {busyKey === "new-user" ? "Olusturuluyor..." : "Kullanici Olustur"}
+            </button>
+          </article>
+        )}
+
         <div className="mt-4 space-y-4">
           {users.map((user) => {
             const draft = userDrafts[user.id] ?? toDraftUser(user);
