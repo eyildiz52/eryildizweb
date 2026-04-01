@@ -66,7 +66,7 @@ export default async function VideosPage() {
                 href={video.video_url}
                 target="_blank"
                 rel="noreferrer"
-                className="mx-5 mb-5 inline-flex w-fit rounded-full border border-white/30 px-4 py-2 text-sm text-white"
+                className="mx-5 mb-5 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-[#f8b84e]/35 bg-[#f8b84e]/15 px-5 py-2.5 text-sm font-semibold text-[#ffe0a5] transition hover:bg-[#f8b84e]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f8b84e]/60"
               >
                 Videoyu Ac
               </a>

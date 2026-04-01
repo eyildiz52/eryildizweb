@@ -142,7 +142,7 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
             href={item.demo_url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/90"
+            className="inline-flex cursor-pointer items-center rounded-full border border-[#f8b84e]/35 bg-[#f8b84e]/15 px-4 py-2 text-sm font-semibold text-[#ffe0a5] transition hover:bg-[#f8b84e]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f8b84e]/60"
           >
             Demo Videosu
           </a>
