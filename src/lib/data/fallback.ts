@@ -51,18 +51,10 @@ export const fallbackPackages: SoftwarePackage[] = [
 export const fallbackVideos: PlatformVideo[] = [
   {
     id: "vid-1",
-    title: "CRM Lite 3 Dakikada",
-    summary: "Musteri karti, teklif yonetimi ve ekip gorev akislarini ozetleyen hizli tanitim videosu.",
-    video_url: "https://www.youtube.com/watch?v=ysz5S6PUM-U",
-    cover_url: null,
-    is_published: true,
-  },
-  {
-    id: "vid-2",
-    title: "Stok Mini Kurulum",
-    summary: "Kurulum, ilk urun tanimi ve stok hareketi mantigini gosteren adim adim anlatim.",
-    video_url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-    cover_url: null,
+    title: "Kullanici Arayuz Tanitimi",
+    summary: "Yazilim paketinin kullanici arayuzunu, ekranlarini ve temel kullanim akisini gosteren tanitim videosu.",
+    video_url: "https://www.youtube.com/watch?v=ARrIYQLSGVs",
+    cover_url: "https://img.youtube.com/vi/ARrIYQLSGVs/hqdefault.jpg",
     is_published: true,
   },
 ];

@@ -280,17 +280,10 @@ set title = excluded.title,
 insert into software_videos (title, summary, video_url, cover_url, is_published)
 values
   (
-    'CRM Lite 3 Dakikada',
-    'Musteri karti, teklif yonetimi ve ekip gorev akislarini ozetleyen hizli tanitim videosu.',
-    'https://www.youtube.com/watch?v=ysz5S6PUM-U',
-    'https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg',
-    true
-  ),
-  (
-    'Stok Mini Kurulum',
-    'Kurulum, ilk urun tanimi ve stok hareketi mantigini gosteren adim adim anlatim.',
-    'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-    'https://img.youtube.com/vi/jNQXAC9IVRw/hqdefault.jpg',
+    'Kullanici Arayuz Tanitimi',
+    'Yazilim paketinin kullanici arayuzunu, ekranlarini ve temel kullanim akisini gosteren tanitim videosu.',
+    'https://www.youtube.com/watch?v=ARrIYQLSGVs',
+    'https://img.youtube.com/vi/ARrIYQLSGVs/hqdefault.jpg',
     true
   )
 on conflict (video_url) do update
