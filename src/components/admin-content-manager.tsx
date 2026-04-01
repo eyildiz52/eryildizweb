@@ -26,9 +26,20 @@ type AdminPackage = {
   created_at: string;
 };
 
+type AdminUser = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  company_name: string | null;
+  role: "admin" | "member";
+  created_at: string;
+  updated_at: string | null;
+};
+
 type Props = {
   initialVideos: AdminVideo[];
   initialPackages: AdminPackage[];
+  initialUsers: AdminUser[];
 };
 
 type DraftVideo = {
@@ -47,6 +58,14 @@ type DraftPackage = {
   currency: string;
   demo_url: string;
   is_active: boolean;
+};
+
+type DraftUser = {
+  email: string;
+  full_name: string;
+  company_name: string;
+  role: "admin" | "member";
+  password: string;
 };
 
 function toDraftVideo(video: AdminVideo): DraftVideo {
@@ -71,15 +90,30 @@ function toDraftPackage(item: AdminPackage): DraftPackage {
   };
 }
 
-export function AdminContentManager({ initialVideos, initialPackages }: Props) {
+function toDraftUser(user: AdminUser): DraftUser {
+  return {
+    email: user.email,
+    full_name: user.full_name ?? "",
+    company_name: user.company_name ?? "",
+    role: user.role,
+    password: "",
+  };
+}
+
+export function AdminContentManager({ initialVideos, initialPackages, initialUsers }: Props) {
   const [videos, setVideos] = useState<AdminVideo[]>(initialVideos);
   const [packages, setPackages] = useState<AdminPackage[]>(initialPackages);
+  const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [videoDrafts, setVideoDrafts] = useState<Record<string, DraftVideo>>(() => {
     const entries = initialVideos.map((video) => [video.id, toDraftVideo(video)] as const);
     return Object.fromEntries(entries);
   });
   const [packageDrafts, setPackageDrafts] = useState<Record<string, DraftPackage>>(() => {
     const entries = initialPackages.map((item) => [item.id, toDraftPackage(item)] as const);
+    return Object.fromEntries(entries);
+  });
+  const [userDrafts, setUserDrafts] = useState<Record<string, DraftUser>>(() => {
+    const entries = initialUsers.map((user) => [user.id, toDraftUser(user)] as const);
     return Object.fromEntries(entries);
   });
   const [newVideo, setNewVideo] = useState<DraftVideo>({
@@ -95,6 +129,10 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
   const publishedCount = useMemo(
     () => videos.filter((item) => item.is_published).length,
     [videos]
+  );
+  const adminCount = useMemo(
+    () => users.filter((item) => item.role === "admin").length,
+    [users]
   );
 
   const writeMessage = (text: string) => {
@@ -131,6 +169,21 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
     setPackages(nextPackages);
     setPackageDrafts(
       Object.fromEntries(nextPackages.map((item) => [item.id, toDraftPackage(item)]))
+    );
+  };
+
+  const refreshUsers = async () => {
+    const res = await fetch("/api/admin/users", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error ?? "Kullanici listesi yenilenemedi.");
+    }
+
+    const nextUsers = (data.users ?? []) as AdminUser[];
+    setUsers(nextUsers);
+    setUserDrafts(
+      Object.fromEntries(nextUsers.map((user) => [user.id, toDraftUser(user)]))
     );
   };
 
@@ -269,6 +322,41 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
     }
   };
 
+  const saveUser = async (id: string) => {
+    const draft = userDrafts[id];
+    if (!draft) {
+      return;
+    }
+
+    setBusyKey(`user-${id}`);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          email: draft.email,
+          fullName: draft.full_name,
+          companyName: draft.company_name,
+          role: draft.role,
+          password: draft.password || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Kullanici guncellenemedi.");
+      }
+
+      await refreshUsers();
+      writeMessage("Kullanici guncellendi.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Kullanici guncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="glass-card space-y-3">
@@ -277,6 +365,9 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
         <p className="max-w-3xl text-sm leading-7 text-white/80">
           Bu panelde video vitrinini ve paket iceriklerini guncelleyebilirsiniz.
           Yayinlanan video sayisi su anda <span className="font-semibold text-[#ffd98a]">{publishedCount}</span>.
+        </p>
+        <p className="text-sm leading-7 text-white/70">
+          Kullanicilar tarafinda toplam <span className="font-semibold text-[#ffd98a]">{adminCount}</span> admin hesap tanimli.
         </p>
         {message ? (
           <p className="rounded-xl border border-[#f8b84e]/35 bg-[#f8b84e]/10 px-4 py-2 text-sm text-[#ffe0a5]">
@@ -341,6 +432,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                 return (
                   <div key={video.id} className="space-y-2 rounded-xl border border-white/15 bg-white/5 p-3">
                     <input
+                      aria-label={`${video.title} video basligi`}
                       value={draft.title}
                       onChange={(event) =>
                         setVideoDrafts((old) => ({
@@ -351,6 +443,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                     />
                     <textarea
+                      aria-label={`${video.title} video ozeti`}
                       value={draft.summary}
                       onChange={(event) =>
                         setVideoDrafts((old) => ({
@@ -362,6 +455,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                     />
                     <input
+                      aria-label={`${video.title} video baglantisi`}
                       value={draft.video_url}
                       onChange={(event) =>
                         setVideoDrafts((old) => ({
@@ -418,6 +512,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                 <p className="text-xs text-white/60">{item.slug} • {item.package_type.toUpperCase()}</p>
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <input
+                    aria-label={`${item.slug} paket basligi`}
                     value={draft.title}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -428,6 +523,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
                   <input
+                    aria-label={`${item.slug} para birimi`}
                     value={draft.currency}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -438,6 +534,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
                   <input
+                    aria-label={`${item.slug} kisa aciklama`}
                     value={draft.short_description}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -448,6 +545,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                     className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
                   <textarea
+                    aria-label={`${item.slug} uzun aciklama`}
                     value={draft.long_description}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -459,6 +557,7 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                     className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
                   <input
+                    aria-label={`${item.slug} fiyat`}
                     value={draft.price}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -501,6 +600,107 @@ export function AdminContentManager({ initialVideos, initialPackages }: Props) {
                   >
                     Kaydet
                   </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="feature-panel p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-2xl text-white">Kullanici Yonetimi</h2>
+            <p className="mt-2 text-sm text-white/75">
+              Buradan rol degistirebilir, profil bilgilerini guncelleyebilir ve yeni sifre atayabilirsiniz.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-4">
+          {users.map((user) => {
+            const draft = userDrafts[user.id] ?? toDraftUser(user);
+            return (
+              <article key={user.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-white/60">
+                    {user.id} • {new Date(user.created_at).toLocaleDateString("tr-TR")}
+                  </p>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-white/80">
+                    {user.role.toUpperCase()}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  <input
+                    value={draft.email}
+                    onChange={(event) =>
+                      setUserDrafts((old) => ({
+                        ...old,
+                        [user.id]: { ...draft, email: event.target.value },
+                      }))
+                    }
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                    placeholder="E-posta"
+                  />
+                  <select
+                    aria-label={`${user.email} kullanici rolu`}
+                    value={draft.role}
+                    onChange={(event) =>
+                      setUserDrafts((old) => ({
+                        ...old,
+                        [user.id]: { ...draft, role: event.target.value as "admin" | "member" },
+                      }))
+                    }
+                    className="rounded-lg border border-white/20 bg-[#0f1b2d] px-3 py-2 text-sm text-white outline-none"
+                  >
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <input
+                    value={draft.full_name}
+                    onChange={(event) =>
+                      setUserDrafts((old) => ({
+                        ...old,
+                        [user.id]: { ...draft, full_name: event.target.value },
+                      }))
+                    }
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                    placeholder="Ad Soyad"
+                  />
+                  <input
+                    value={draft.company_name}
+                    onChange={(event) =>
+                      setUserDrafts((old) => ({
+                        ...old,
+                        [user.id]: { ...draft, company_name: event.target.value },
+                      }))
+                    }
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                    placeholder="Firma"
+                  />
+                  <input
+                    type="password"
+                    value={draft.password}
+                    onChange={(event) =>
+                      setUserDrafts((old) => ({
+                        ...old,
+                        [user.id]: { ...draft, password: event.target.value },
+                      }))
+                    }
+                    className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                    placeholder="Yeni sifre (degistirmek istemezsen bos birak)"
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => saveUser(user.id)}
+                    disabled={busyKey === `user-${user.id}`}
+                    className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
+                  >
+                    {busyKey === `user-${user.id}` ? "Kaydediliyor..." : "Kullaniciyi Kaydet"}
+                  </button>
+                  <p className="text-xs text-white/60">
+                    Son guncelleme: {user.updated_at ? new Date(user.updated_at).toLocaleString("tr-TR") : "Henuz yok"}
+                  </p>
                 </div>
               </article>
             );

@@ -42,7 +42,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [videosRes, packagesRes] = await Promise.all([
+  const [videosRes, packagesRes, usersRes] = await Promise.all([
     admin
       .from("software_videos")
       .select("id,title,summary,video_url,cover_url,is_published,created_at")
@@ -51,16 +51,22 @@ export default async function AdminPage() {
       .from("software_packages")
       .select("id,slug,title,short_description,long_description,package_type,price,currency,demo_url,is_active,created_at")
       .order("created_at", { ascending: false }),
+    admin
+      .from("profiles")
+      .select("id,email,full_name,company_name,role,created_at,updated_at")
+      .order("created_at", { ascending: false }),
   ]);
 
   const videos = videosRes.data ?? [];
   const packages = packagesRes.data ?? [];
+  const users = usersRes.data ?? [];
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-12 md:px-10">
       <AdminContentManager
         initialVideos={videos}
         initialPackages={packages}
+        initialUsers={users}
       />
     </main>
   );
