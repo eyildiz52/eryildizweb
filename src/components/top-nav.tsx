@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/channel/UCRZrC5Ljrrrv2LBTcY32Wbg";
@@ -10,18 +9,6 @@ export async function TopNav() {
   const user = supabase
     ? (await supabase.auth.getUser()).data.user
     : null;
-  const admin = getSupabaseAdminClient();
-  let isAdmin = false;
-
-  if (user && admin) {
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    isAdmin = profile?.role === "admin";
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#08111f]/85 backdrop-blur-xl">
@@ -51,7 +38,7 @@ export async function TopNav() {
             { href: "/paketler", label: "Paketler" },
             { href: "/demolar", label: "Demolar" },
             { href: "/videolar", label: "Videolar" },
-            ...(isAdmin ? [{ href: "/yonetim", label: "Yonetim" }] : []),
+            ...(user ? [{ href: "/yonetim", label: "Yonetim" }] : []),
             { href: "/mesajlar", label: "Mesajlar" },
             { href: YOUTUBE_CHANNEL_URL, label: "YouTube", external: true },
           ].map((item) => (
