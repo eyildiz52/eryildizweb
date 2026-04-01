@@ -1,6 +1,13 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+function getConfiguredAdminEmails() {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 type AdminAccessResult = {
   ok: boolean;
   status: number;
@@ -30,6 +37,9 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     };
   }
 
+  const userEmail = (user.email ?? "").trim().toLowerCase();
+  const configuredAdmins = getConfiguredAdminEmails();
+
   const admin = getSupabaseAdminClient();
   if (!admin) {
     return {
@@ -46,6 +56,14 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     .maybeSingle();
 
   if (profileError) {
+    if (userEmail && configuredAdmins.includes(userEmail)) {
+      return {
+        ok: true,
+        status: 200,
+        userId: user.id,
+      };
+    }
+
     return {
       ok: false,
       status: 500,
@@ -53,7 +71,7 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     };
   }
 
-  if (profile?.role !== "admin") {
+  if (profile?.role !== "admin" && !(userEmail && configuredAdmins.includes(userEmail))) {
     return {
       ok: false,
       status: 403,
