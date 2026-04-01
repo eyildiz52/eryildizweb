@@ -277,6 +277,12 @@ set title = excluded.title,
     demo_url = excluded.demo_url,
     is_active = excluded.is_active;
 
+delete from software_videos
+where video_url in (
+  'https://www.youtube.com/watch?v=ysz5S6PUM-U',
+  'https://www.youtube.com/watch?v=jNQXAC9IVRw'
+);
+
 insert into software_videos (title, summary, video_url, cover_url, is_published)
 values
   (
