@@ -7,6 +7,8 @@ import {
 } from "@/lib/payments/stripe";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
   const supabase = await getSupabaseServerClient();

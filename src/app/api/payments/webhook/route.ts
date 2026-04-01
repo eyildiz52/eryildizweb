@@ -3,6 +3,8 @@ import Stripe from "stripe";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/payments/stripe";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const stripe = getStripeClient();
   const webhookSecret = getStripeWebhookSecret();

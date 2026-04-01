@@ -10,6 +10,8 @@ export function getStripeClient() {
 
   return new Stripe(stripeSecretKey, {
     apiVersion: "2026-03-25.dahlia",
+    timeout: 20_000,
+    maxNetworkRetries: 2,
   });
 }
 
