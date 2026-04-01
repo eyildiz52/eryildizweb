@@ -37,6 +37,7 @@ main {
     linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(circle at center, black 42%, transparent 84%);
   mask-image: radial-gradient(circle at center, black 42%, transparent 84%);
   pointer-events: none;
 }
@@ -46,6 +47,7 @@ main {
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
   border-radius: 1.25rem;
   padding: 1.4rem;
+  -webkit-backdrop-filter: blur(9px);
   backdrop-filter: blur(9px);
   transition: transform 220ms ease, border-color 220ms ease, background 220ms ease;
 }
@@ -54,6 +56,40 @@ main {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.28);
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+}
+
+.feature-panel {
+  border: 1px solid rgba(248, 184, 78, 0.18);
+  background:
+    linear-gradient(145deg, rgba(18, 28, 52, 0.92), rgba(8, 17, 31, 0.8)),
+    linear-gradient(180deg, rgba(248, 184, 78, 0.08), rgba(255, 255, 255, 0));
+  border-radius: 1.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 26px 70px rgba(3, 8, 20, 0.28);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.page-glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.24;
+  pointer-events: none;
+}
+
+.page-glow-left {
+  top: 80px;
+  left: -140px;
+  background: #f59e0b;
+}
+
+.page-glow-right {
+  top: 220px;
+  right: -180px;
+  background: #0ea5e9;
 }
 
 @keyframes fade-up {

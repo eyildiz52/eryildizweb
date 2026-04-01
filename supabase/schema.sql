@@ -94,6 +94,8 @@ create table if not exists email_logs (
 
 create index if not exists idx_software_packages_active
   on software_packages (is_active, created_at desc);
+create unique index if not exists idx_software_videos_video_url
+  on software_videos (video_url);
 create index if not exists idx_orders_user_package
   on orders (user_id, package_id, payment_status);
 create index if not exists idx_messages_participants
@@ -227,8 +229,8 @@ values
   (
     'crm-lite',
     'CRM Lite',
-    'Kucuk ekipler icin hizli musteri takibi.',
-    'Teklif, gorev ve musteri notlarini tek panelde yonetirsiniz.',
+    'Kucuk ve orta olcekli ekipler icin hizli musteri, teklif ve gorev takibi.',
+    'Musteri kartlari, teklif surecleri ve operasyon notlarini tek panelde yoneterek satis akisina hiz kazandirin.',
     'paid',
     1490,
     'TRY',
@@ -240,8 +242,8 @@ values
   (
     'stok-mini',
     'Stok Mini',
-    'Basit stok giris-cikis ve raporlama.',
-    'Kobi odakli stok takibi icin kolay kullanimli masaustu paket.',
+    'Kobi odakli stok giris-cikis, urun hareketi ve temel raporlama.',
+    'Depo veya magaza tarafinda urun hareketlerini sade bir arayuzle izlemek isteyen isletmeler icin pratik stok paketi.',
     'paid',
     990,
     'TRY',
@@ -253,8 +255,8 @@ values
   (
     'on-muhasebe-demo',
     'On Muhasebe Demo',
-    'Ucretsiz indirilebilir deneme surumu.',
-    'Fatura, cari ve kasa akislarini test etmek icin demo paket.',
+    'Ucretsiz indirilebilir demo surum ile ekranlari ve is akislarini test edin.',
+    'Cari, fatura ve kasa hareketlerini satin alma karari vermeden once deneyimlemek icin hazirlanan tanitim paketi.',
     'demo',
     0,
     'TRY',
@@ -263,20 +265,36 @@ values
     'https://www.youtube.com/watch?v=ysz5S6PUM-U',
     true
   )
-on conflict (slug) do nothing;
+on conflict (slug) do update
+set title = excluded.title,
+    short_description = excluded.short_description,
+    long_description = excluded.long_description,
+    package_type = excluded.package_type,
+    price = excluded.price,
+    currency = excluded.currency,
+    storage_bucket = excluded.storage_bucket,
+    storage_path = excluded.storage_path,
+    demo_url = excluded.demo_url,
+    is_active = excluded.is_active;
 
-insert into software_videos (title, summary, video_url, is_published)
+insert into software_videos (title, summary, video_url, cover_url, is_published)
 values
   (
     'CRM Lite 3 Dakikada',
-    'Musteri karti, teklif ve gorev akislarini hizli tanitim videosu.',
+    'Musteri karti, teklif yonetimi ve ekip gorev akislarini ozetleyen hizli tanitim videosu.',
     'https://www.youtube.com/watch?v=ysz5S6PUM-U',
+    'https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg',
     true
   ),
   (
     'Stok Mini Kurulum',
-    'Kurulum ve ilk stok karti acilisi adim adim anlatim.',
+    'Kurulum, ilk urun tanimi ve stok hareketi mantigini gosteren adim adim anlatim.',
     'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+    'https://img.youtube.com/vi/jNQXAC9IVRw/hqdefault.jpg',
     true
   )
-on conflict do nothing;
+on conflict (video_url) do update
+set title = excluded.title,
+    summary = excluded.summary,
+    cover_url = excluded.cover_url,
+    is_published = excluded.is_published;
