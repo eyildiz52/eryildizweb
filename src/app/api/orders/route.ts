@@ -9,6 +9,26 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+function getPaymentMode() {
+  return (process.env.PAYMENT_MODE ?? "stripe").trim().toLowerCase();
+}
+
+function getManualPaymentConfig() {
+  const accountName = (process.env.MANUAL_PAYMENT_ACCOUNT_NAME ?? "ER YILDIZ YAZILIM").trim();
+  const iban = (process.env.MANUAL_PAYMENT_IBAN ?? "").replace(/\s+/g, "").trim();
+  const bankName = (process.env.MANUAL_PAYMENT_BANK_NAME ?? "").trim();
+
+  if (!iban) {
+    return null;
+  }
+
+  return {
+    accountName,
+    iban,
+    bankName,
+  };
+}
+
 export async function POST(request: Request) {
   try {
   const supabase = await getSupabaseServerClient();
@@ -35,10 +55,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const stripe = getStripeClient();
-  if (!stripe) {
+  const paymentMode = getPaymentMode();
+  const useManualPayment = paymentMode === "manual";
+  const manualPayment = useManualPayment ? getManualPaymentConfig() : null;
+
+  const stripe = useManualPayment ? null : getStripeClient();
+  if (!useManualPayment && !stripe) {
     return NextResponse.json(
       { error: "Stripe SECRET key eksik veya formati hatali." },
+      { status: 503 }
+    );
+  }
+
+  if (useManualPayment && !manualPayment) {
+    return NextResponse.json(
+      { error: "Havale/EFT modu aktif ama MANUAL_PAYMENT_IBAN tanimli degil." },
       { status: 503 }
     );
   }
@@ -96,9 +127,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, message: "Bu paket zaten satin alinmis." });
   }
 
+  const { data: existingPending } = await admin
+    .from("orders")
+    .select("id,payment_reference")
+    .eq("user_id", user.id)
+    .eq("package_id", pkg.id)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .maybeSingle();
+
+  if (existingPending?.id && useManualPayment && manualPayment) {
+    return NextResponse.json({
+      ok: true,
+      message: "Bu paket icin bekleyen Havale/EFT talebiniz var.",
+      manualPayment,
+    });
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  const session = await stripe.checkout.sessions.create({
+  if (useManualPayment && manualPayment) {
+    const reference = `manual-${Date.now()}-${pkg.id.slice(0, 8)}`;
+    const { error: insertManualOrderError } = await admin.from("orders").insert({
+      user_id: user.id,
+      package_id: pkg.id,
+      amount: pkg.price,
+      currency: pkg.currency,
+      payment_status: "pending",
+      payment_reference: reference,
+    });
+
+    if (insertManualOrderError) {
+      return NextResponse.json({ error: "Talep olusturulamadi." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: "Havale/EFT talebi olusturuldu. Aciklamaya referans kodunu yazin.",
+      manualPayment: {
+        ...manualPayment,
+        reference,
+      },
+      successRedirectUrl: `${appUrl}/paketler?payment=pending`,
+    });
+  }
+
+  const session = await stripe!.checkout.sessions.create({
     mode: "payment",
     success_url: `${appUrl}/paketler?payment=success`,
     cancel_url: `${appUrl}/paketler?payment=cancel`,

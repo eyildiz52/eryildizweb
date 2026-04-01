@@ -104,6 +104,11 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
           Odeme islemi iptal edildi. Dilerseniz satin alma adimini tekrar baslatabilirsiniz.
         </div>
       ) : null}
+      {payment === "pending" ? (
+        <div className="mb-6 rounded-2xl border border-amber-300/40 bg-amber-500/15 px-5 py-4 text-sm text-amber-100">
+          Havale/EFT talebiniz olusturuldu. Aciklama kodu ile odemeyi tamamlayinca paketiniz onaylanacaktir.
+        </div>
+      ) : null}
 
       {user ? (
         <section className="mb-6 glass-card p-4">

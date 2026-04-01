@@ -30,8 +30,12 @@ Bu proje yazilim paketleri satabileceginiz, demolari dagitabildiginiz, videolar 
    - NEXT_PUBLIC_SUPABASE_ANON_KEY
    - SUPABASE_SERVICE_ROLE_KEY
    - NEXT_PUBLIC_APP_URL
+   - PAYMENT_MODE
    - STRIPE_SECRET_KEY
    - STRIPE_WEBHOOK_SECRET
+   - MANUAL_PAYMENT_ACCOUNT_NAME
+   - MANUAL_PAYMENT_BANK_NAME
+   - MANUAL_PAYMENT_IBAN
    - SMTP_HOST
    - SMTP_PORT
    - SMTP_SECURE
@@ -68,6 +72,25 @@ Bu proje yazilim paketleri satabileceginiz, demolari dagitabildiginiz, videolar 
 - Stripe, `/api/payments/webhook` endpointine `checkout.session.completed` gonderdiginde siparis `paid` olur.
 - `checkout.session.expired` eventinde siparis `failed` olur.
 - Indirme route'u sadece `paid` siparis varsa signed URL dondurur.
+
+## Gecici Havale/EFT Modu
+
+- Odeme sirketi onayi beklenirken `PAYMENT_MODE=manual` yaparak kart odemesi yerine Havale/EFT talebi acabilirsiniz.
+- Kullanici Satin Al dediginde siparis `pending` olarak kaydolur ve ekranda hesap bilgisi + aciklama referansi gosterilir.
+- Gerekli env degiskenleri: `PAYMENT_MODE=manual`, `MANUAL_PAYMENT_ACCOUNT_NAME`, `MANUAL_PAYMENT_BANK_NAME`, `MANUAL_PAYMENT_IBAN`
+
+## Siparis Onaylama API (Tek Islem)
+
+- Bekleyen siparisi SQL yazmadan `paid` yapmak icin admin endpoint eklendi: `/api/admin/orders`
+- Guvenlik icin her istekte `x-admin-key` header degeri `ADMIN_API_KEY` ile ayni olmalidir.
+- Env:
+  - `ADMIN_API_KEY`
+- Bekleyen siparisleri listele (GET):
+  - `curl -X GET https://eryildizyazilim.com/api/admin/orders -H "x-admin-key: SENIN_SECRET"`
+- Siparisi `orderId` ile paid yap (POST):
+  - `curl -X POST https://eryildizyazilim.com/api/admin/orders -H "Content-Type: application/json" -H "x-admin-key: SENIN_SECRET" -d "{\"orderId\":\"UUID\"}"`
+- Siparisi `paymentReference` ile paid yap (POST):
+  - `curl -X POST https://eryildizyazilim.com/api/admin/orders -H "Content-Type: application/json" -H "x-admin-key: SENIN_SECRET" -d "{\"paymentReference\":\"manual-...\"}"`
 
 ## Kritik Not
 

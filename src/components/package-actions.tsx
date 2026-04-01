@@ -13,6 +13,24 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
   const [status, setStatus] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
+  const buildManualPaymentMessage = (manualPayment: {
+    accountName?: string;
+    bankName?: string;
+    iban?: string;
+    reference?: string;
+  }) => {
+    const lines = [
+      "Havale/EFT ile odeme talebiniz olusturuldu.",
+      manualPayment.accountName ? `Alici: ${manualPayment.accountName}` : null,
+      manualPayment.bankName ? `Banka: ${manualPayment.bankName}` : null,
+      manualPayment.iban ? `IBAN: ${manualPayment.iban}` : null,
+      manualPayment.reference ? `Aciklama: ${manualPayment.reference}` : null,
+      "Dekont sonrasi odemeniz onaylaninca indirme aktif olur.",
+    ].filter(Boolean);
+
+    return lines.join("\n");
+  };
+
   const isPaid = paymentStatus === "paid";
   const isPending = paymentStatus === "pending";
 
@@ -57,7 +75,17 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
         return;
       }
 
-      setStatus("Talebiniz alindi. Odeme onayi sonrasi indirme aktif edilir.");
+      if (data.manualPayment) {
+        setStatus(buildManualPaymentMessage(data.manualPayment));
+        return;
+      }
+
+      if (data.successRedirectUrl) {
+        window.location.href = data.successRedirectUrl as string;
+        return;
+      }
+
+      setStatus(data.message ?? "Talebiniz alindi. Odeme onayi sonrasi indirme aktif edilir.");
     } catch {
       setStatus("Sunucu hatasi olustu.");
     } finally {
@@ -121,7 +149,7 @@ export function PackageActions({ item, hasUser, paymentStatus }: Props) {
         ) : null}
       </div>
 
-      {status ? <p className="text-xs text-[#ffd98a]">{status}</p> : null}
+      {status ? <p className="whitespace-pre-line text-xs text-[#ffd98a]">{status}</p> : null}
     </div>
   );
 }
