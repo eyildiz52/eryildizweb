@@ -11,7 +11,7 @@ type UserPatchPayload = {
   password?: string;
 };
 
-const MIN_ADMIN_SET_PASSWORD_LENGTH = 3;
+const MIN_ADMIN_SET_PASSWORD_LENGTH = 8;
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") {
