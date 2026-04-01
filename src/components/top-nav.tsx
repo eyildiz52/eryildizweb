@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/channel/UCRZrC5Ljrrrv2LBTcY32Wbg";
+
 export async function TopNav() {
   const supabase = await getSupabaseServerClient();
   const user = supabase
@@ -37,10 +39,23 @@ export async function TopNav() {
             { href: "/demolar", label: "Demolar" },
             { href: "/videolar", label: "Videolar" },
             { href: "/mesajlar", label: "Mesajlar" },
+            { href: YOUTUBE_CHANNEL_URL, label: "YouTube", external: true },
           ].map((item) => (
-            <Link key={item.href} href={item.href} className="hover:text-white">
-              {item.label}
-            </Link>
+            item.external ? (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white"
+              >
+                {item.label}
+              </a>
+            ) : (
+              <Link key={item.href} href={item.href} className="hover:text-white">
+                {item.label}
+              </Link>
+            )
           ))}
 
           <Link
