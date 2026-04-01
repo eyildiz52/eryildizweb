@@ -42,7 +42,7 @@ export const fallbackPackages: SoftwarePackage[] = [
     currency: "TRY",
     storage_bucket: "software-files",
     storage_path: "demo/on-muhasebe-demo.zip",
-    demo_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    demo_url: "https://www.youtube.com/watch?v=ARrIYQLSGVs",
     thumbnail_url: null,
     is_active: true,
   },

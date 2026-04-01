@@ -262,7 +262,7 @@ values
     'TRY',
     'software-files',
     'demo/on-muhasebe-demo.zip',
-    'https://www.youtube.com/watch?v=ysz5S6PUM-U',
+    'https://www.youtube.com/watch?v=ARrIYQLSGVs',
     true
   )
 on conflict (slug) do update
