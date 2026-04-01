@@ -51,7 +51,7 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
 
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("role")
+    .select("id,email,role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -71,7 +71,34 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     };
   }
 
-  if (profile?.role !== "admin" && !(userEmail && configuredAdmins.includes(userEmail))) {
+  const hasConfiguredAdminAccess = userEmail && configuredAdmins.includes(userEmail);
+
+  if (profile?.role !== "admin" && !hasConfiguredAdminAccess) {
+    const { count: adminCount, error: adminCountError } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "admin");
+
+    if (!adminCountError && (adminCount ?? 0) === 0 && profile?.id) {
+      const { error: promoteError } = await admin
+        .from("profiles")
+        .update({
+          role: "admin",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", profile.id);
+
+      if (!promoteError) {
+        return {
+          ok: true,
+          status: 200,
+          userId: user.id,
+        };
+      }
+    }
+  }
+
+  if (profile?.role !== "admin" && !hasConfiguredAdminAccess) {
     return {
       ok: false,
       status: 403,
