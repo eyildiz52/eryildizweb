@@ -36,10 +36,23 @@ type AdminUser = {
   updated_at: string | null;
 };
 
+type AdminOrder = {
+  id: string;
+  user_id: string;
+  package_id: string;
+  amount: number;
+  currency: string;
+  payment_status: "pending" | "paid" | "failed" | "refunded";
+  payment_reference: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
 type Props = {
   initialVideos: AdminVideo[];
   initialPackages: AdminPackage[];
   initialUsers: AdminUser[];
+  initialOrders: AdminOrder[];
 };
 
 type DraftVideo = {
@@ -100,10 +113,25 @@ function toDraftUser(user: AdminUser): DraftUser {
   };
 }
 
-export function AdminContentManager({ initialVideos, initialPackages, initialUsers }: Props) {
+function getOrderStatusLabel(status: AdminOrder["payment_status"]) {
+  if (status === "pending") return "Odeme Bekleniyor";
+  if (status === "paid") return "Odeme Onaylandi";
+  if (status === "failed") return "Odeme Basarisiz";
+  return "Iade Edildi";
+}
+
+function getOrderStatusClass(status: AdminOrder["payment_status"]) {
+  if (status === "pending") return "border-amber-300/40 bg-amber-500/15 text-amber-100";
+  if (status === "paid") return "border-emerald-300/40 bg-emerald-500/15 text-emerald-100";
+  if (status === "failed") return "border-rose-300/40 bg-rose-500/15 text-rose-100";
+  return "border-slate-300/40 bg-slate-500/15 text-slate-100";
+}
+
+export function AdminContentManager({ initialVideos, initialPackages, initialUsers, initialOrders }: Props) {
   const [videos, setVideos] = useState<AdminVideo[]>(initialVideos);
   const [packages, setPackages] = useState<AdminPackage[]>(initialPackages);
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
+  const [orders, setOrders] = useState<AdminOrder[]>(initialOrders);
   const [videoDrafts, setVideoDrafts] = useState<Record<string, DraftVideo>>(() => {
     const entries = initialVideos.map((video) => [video.id, toDraftVideo(video)] as const);
     return Object.fromEntries(entries);
@@ -141,6 +169,10 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
   const adminCount = useMemo(
     () => users.filter((item) => item.role === "admin").length,
     [users]
+  );
+  const pendingOrderCount = useMemo(
+    () => orders.filter((item) => item.payment_status === "pending").length,
+    [orders]
   );
 
   const writeMessage = (text: string) => {
@@ -193,6 +225,40 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     setUserDrafts(
       Object.fromEntries(nextUsers.map((user) => [user.id, toDraftUser(user)]))
     );
+  };
+
+  const refreshOrders = async () => {
+    const res = await fetch("/api/admin/orders", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error ?? "Siparis listesi yenilenemedi.");
+    }
+
+    setOrders((data.orders ?? []) as AdminOrder[]);
+  };
+
+  const setOrderStatus = async (orderId: string, status: AdminOrder["payment_status"]) => {
+    setBusyKey(`order-${orderId}-${status}`);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Siparis durumu guncellenemedi.");
+      }
+
+      await refreshOrders();
+      writeMessage("Siparis durumu guncellendi.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Siparis durumu guncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
   };
 
   const createVideo = async () => {
@@ -420,6 +486,9 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         </p>
         <p className="text-sm leading-7 text-white/70">
           Kullanicilar tarafinda toplam <span className="font-semibold text-[#ffd98a]">{adminCount}</span> admin hesap tanimli.
+        </p>
+        <p className="text-sm leading-7 text-white/70">
+          Bekleyen siparis sayisi <span className="font-semibold text-[#ffd98a]">{pendingOrderCount}</span>.
         </p>
         {message ? (
           <p className="rounded-xl border border-[#f8b84e]/35 bg-[#f8b84e]/10 px-4 py-2 text-sm text-[#ffe0a5]">
@@ -656,6 +725,93 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="feature-panel p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-2xl text-white">Siparis Yonetimi</h2>
+            <p className="mt-2 text-sm text-white/75">
+              Buradan odeme durumlarini guncelleyebilir, bekleyen siparisleri hizlica onaylayabilirsiniz.
+            </p>
+          </div>
+          <button
+            onClick={refreshOrders}
+            className="rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            Yenile
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {orders.length === 0 ? (
+            <p className="text-sm text-white/75">Henuz siparis yok.</p>
+          ) : (
+            orders.map((order) => {
+              const customer = users.find((item) => item.id === order.user_id);
+              const pkg = packages.find((item) => item.id === order.package_id);
+              return (
+                <article key={order.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-white/60">{order.id}</p>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs ${getOrderStatusClass(order.payment_status)}`}
+                    >
+                      {getOrderStatusLabel(order.payment_status)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-white/85 md:grid-cols-2">
+                    <p>
+                      Musteri: <span className="text-white">{customer?.email ?? order.user_id}</span>
+                    </p>
+                    <p>
+                      Paket: <span className="text-white">{pkg?.title ?? order.package_id}</span>
+                    </p>
+                    <p>
+                      Tutar: <span className="text-white">{order.amount} {order.currency}</span>
+                    </p>
+                    <p>
+                      Tarih: <span className="text-white">{new Date(order.created_at).toLocaleString("tr-TR")}</span>
+                    </p>
+                    <p className="md:col-span-2">
+                      Referans: <span className="text-white">{order.payment_reference ?? "-"}</span>
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setOrderStatus(order.id, "paid")}
+                      disabled={busyKey === `order-${order.id}-paid`}
+                      className="rounded-full bg-emerald-500/85 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      Odeme Onayla
+                    </button>
+                    <button
+                      onClick={() => setOrderStatus(order.id, "failed")}
+                      disabled={busyKey === `order-${order.id}-failed`}
+                      className="rounded-full bg-rose-500/85 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      Basarisiz Isaretle
+                    </button>
+                    <button
+                      onClick={() => setOrderStatus(order.id, "refunded")}
+                      disabled={busyKey === `order-${order.id}-refunded`}
+                      className="rounded-full bg-slate-500/85 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      Iade Isaretle
+                    </button>
+                    <button
+                      onClick={() => setOrderStatus(order.id, "pending")}
+                      disabled={busyKey === `order-${order.id}-pending`}
+                      className="rounded-full border border-amber-300/45 bg-amber-500/15 px-4 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-60"
+                    >
+                      Bekleyene Al
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
         </div>
       </section>
 
