@@ -40,6 +40,11 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
   const userEmail = (user.email ?? "").trim().toLowerCase();
   const configuredAdmins = getConfiguredAdminEmails();
 
+  // ADMIN_EMAILS env var'da varsa profil tablosuna gerek yok — direkt izin ver
+  if (userEmail && configuredAdmins.includes(userEmail)) {
+    return { ok: true, status: 200, userId: user.id };
+  }
+
   const admin = getSupabaseAdminClient();
   if (!admin) {
     return {
@@ -56,14 +61,6 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     .maybeSingle();
 
   if (profileError) {
-    if (userEmail && configuredAdmins.includes(userEmail)) {
-      return {
-        ok: true,
-        status: 200,
-        userId: user.id,
-      };
-    }
-
     return {
       ok: false,
       status: 500,
@@ -71,44 +68,32 @@ export async function requireAdminAccess(): Promise<AdminAccessResult> {
     };
   }
 
-  const hasConfiguredAdminAccess = userEmail && configuredAdmins.includes(userEmail);
-
-  if (profile?.role !== "admin" && !hasConfiguredAdminAccess) {
-    const { count: adminCount, error: adminCountError } = await admin
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin");
-
-    if (!adminCountError && (adminCount ?? 0) === 0 && profile?.id) {
-      const { error: promoteError } = await admin
-        .from("profiles")
-        .update({
-          role: "admin",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", profile.id);
-
-      if (!promoteError) {
-        return {
-          ok: true,
-          status: 200,
-          userId: user.id,
-        };
-      }
-    }
+  // Profil var ve admin — izin ver
+  if (profile?.role === "admin") {
+    return { ok: true, status: 200, userId: user.id };
   }
 
-  if (profile?.role !== "admin" && !hasConfiguredAdminAccess) {
-    return {
-      ok: false,
-      status: 403,
-      error: "Bu alan sadece admin kullanicilar icindir.",
-    };
+  // Sistemde hiç admin yoksa ilk gelen kullaniciyi admin yap (profil satiri olsun olmasin)
+  const { count: adminCount, error: adminCountError } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin");
+
+  if (!adminCountError && (adminCount ?? 0) === 0) {
+    // Profil satiri yoksa once olustur
+    await admin.from("profiles").upsert({
+      id: user.id,
+      email: userEmail,
+      role: "admin",
+      updated_at: new Date().toISOString(),
+    });
+
+    return { ok: true, status: 200, userId: user.id };
   }
 
   return {
-    ok: true,
-    status: 200,
-    userId: user.id,
+    ok: false,
+    status: 403,
+    error: "Bu alan sadece admin kullanicilar icindir.",
   };
 }
