@@ -56,8 +56,16 @@ export async function POST(
     .createSignedUrl(softwarePackage.storage_path, 60 * 10);
 
   if (error || !data?.signedUrl) {
+    const errorDetail =
+      error?.message ??
+      `Bucket: ${softwarePackage.storage_bucket}, Path: ${softwarePackage.storage_path}`;
+
     return NextResponse.json(
-      { error: "Dosya linki olusturulamadi. Storage path kontrol edin." },
+      {
+        error:
+          "Dosya linki olusturulamadi. Muhtemelen dosya Storage'a yuklenmedi veya yol hatali.",
+        detail: errorDetail,
+      },
       { status: 500 }
     );
   }
