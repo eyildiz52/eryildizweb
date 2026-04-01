@@ -3,6 +3,8 @@ import Image from "next/image";
 import { getPublishedVideos } from "@/lib/platform-data";
 import { videosPageHighlights } from "@/lib/site-content";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Videolar | ER YILDIZ YAZILIM",
 };

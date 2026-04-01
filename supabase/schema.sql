@@ -96,8 +96,24 @@ create index if not exists idx_software_packages_active
   on software_packages (is_active, created_at desc);
 create unique index if not exists idx_software_videos_video_url
   on software_videos (video_url);
+create unique index if not exists idx_software_videos_one_published
+  on software_videos ((is_published))
+  where is_published = true;
 create index if not exists idx_orders_user_package
   on orders (user_id, package_id, payment_status);
+
+do $$
+begin
+  alter table software_videos
+    add constraint chk_software_videos_video_url_youtube
+    check (
+      video_url ~* '^https://(www\\.)?(youtube\\.com/watch\\?v=|youtu\\.be/)[A-Za-z0-9_-]{11}([&?].*)?$'
+    );
+exception
+  when duplicate_object then
+    null;
+end
+$$;
 create index if not exists idx_messages_participants
   on messages (sender_id, receiver_id, created_at desc);
 create index if not exists idx_downloads_user
