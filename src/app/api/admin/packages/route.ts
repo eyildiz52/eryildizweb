@@ -259,7 +259,7 @@ export async function POST(request: Request) {
         price,
         currency: currency.toUpperCase(),
         storage_bucket: storageBucket,
-        storage_path: storagePath ? storagePath.replace(/^\\/+/, "") : "",
+        storage_path: storagePath ? storagePath.replace(/^\/+/, "") : "",
         demo_url: cleanOptionalUrl(payload.demoUrl),
         is_active: isActive,
       },
