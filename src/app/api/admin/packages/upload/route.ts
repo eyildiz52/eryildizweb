@@ -147,13 +147,19 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error.message || "Dosya silinemedi." }, { status: 500 });
   }
 
-  await admin
+  const { error: updateError } = await admin
     .from("software_packages")
     .update({
       storage_path: "",
-      updated_at: new Date().toISOString(),
     })
     .eq("id", packageId);
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: `Storage yolu temizlenemedi. ${updateError.message}` },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true, bucket, path });
 }
