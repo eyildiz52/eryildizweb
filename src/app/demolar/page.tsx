@@ -68,6 +68,14 @@ export default async function DemosPage() {
         ) : (
           demoPackages.map((item) => {
             const marketing = getPackageMarketingContent(item.slug, item.title);
+            const isOnMuhasebeDemo = item.slug === "on-muhasebe-demo";
+            const displayTitle = isOnMuhasebeDemo ? "On Muhasebe Demo" : item.title;
+            const displayShortDescription = isOnMuhasebeDemo
+              ? "Ucretsiz indirilebilir demo surum ile ekranlari ve is akislarini test edin."
+              : item.short_description;
+            const displayLongDescription = isOnMuhasebeDemo
+              ? "Cari, fatura ve kasa hareketlerini satin alma karari vermeden once deneyimlemek icin hazirlanan tanitim paketi."
+              : item.long_description;
 
             return (
               <article key={item.id} className="feature-panel">
@@ -78,7 +86,7 @@ export default async function DemosPage() {
                   <span className="text-sm font-semibold text-[#ffd98a]">Ucretsiz Demo</span>
                 </div>
 
-                <h2 className="mt-4 font-heading text-3xl text-white">{item.title}</h2>
+                <h2 className="mt-4 font-heading text-3xl text-white">{displayTitle}</h2>
                 <p className="mt-3 text-sm leading-7 text-white/82">{marketing.valueLine}</p>
 
                 <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
@@ -88,9 +96,9 @@ export default async function DemosPage() {
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs tracking-[0.14em] text-white/55">DEMO OZETI</p>
-                    <p className="mt-2 text-sm leading-7 text-white/78">{item.short_description}</p>
-                    {item.long_description ? (
-                      <p className="mt-2 text-sm leading-7 text-white/68">{item.long_description}</p>
+                    <p className="mt-2 text-sm leading-7 text-white/78">{displayShortDescription}</p>
+                    {displayLongDescription ? (
+                      <p className="mt-2 text-sm leading-7 text-white/68">{displayLongDescription}</p>
                     ) : null}
                   </div>
                 </div>

@@ -9,8 +9,10 @@ import {
   trustHighlights,
 } from "@/lib/site-content";
 
-function formatPrice(price: number, currency: string) {
-  if (!price) {
+export const revalidate = 300;
+
+function formatPrice(price: number, currency: string, packageType: "paid" | "demo") {
+  if (packageType === "demo") {
     return "Ucretsiz";
   }
 
@@ -26,7 +28,9 @@ export default async function Home() {
   const highlightedPackages = packages.slice(0, 3);
   const highlightedVideos = videos.slice(0, 2);
   const paidPackages = packages.filter((item) => item.package_type === "paid");
-  const demoPackages = packages.filter((item) => item.package_type === "demo");
+  const demoPackages = packages.filter(
+    (item) => item.package_type === "demo" || item.slug === "on-muhasebe-demo"
+  );
 
   return (
     <main className="relative isolate overflow-hidden">
@@ -44,8 +48,8 @@ export default async function Home() {
               Yazilim paketlerini guven veren bir arayuzle sun, odemeyi topla, teslimati kontrollu yonet.
             </h1>
             <p className="max-w-2xl text-base leading-8 text-white/80 sm:text-lg">
-              CRM, stok ve on muhasebe odakli urunlerini tek platformda tanit. Demo, video,
-              uyelik ve kontrollu indirme akisiyla ziyaretciyi satin alma kararina daha hizli tasi.
+              Er Proje Yonetimi, Er Proje Yonetimi Mini ve On Muhasebe Demo urunlerini tek platformda tanit.
+              Demo, video, uyelik ve kontrollu indirme akisiyla ziyaretciyi satin alma kararina daha hizli tasi.
             </p>
             <div className="flex flex-wrap gap-3 text-sm text-white/78">
               <span className="rounded-full border border-white/15 bg-white/6 px-4 py-2">Manuel odeme aktif</span>
@@ -145,7 +149,9 @@ export default async function Home() {
                   <span className="rounded-full border border-[#f8b84e]/25 bg-[#f8b84e]/10 px-3 py-1 text-xs tracking-[0.14em] text-[#ffe0a5]">
                     {content.badge}
                   </span>
-                  <span className="text-sm font-semibold text-[#ffd98a]">{formatPrice(item.price, item.currency)}</span>
+                  <span className="text-sm font-semibold text-[#ffd98a]">
+                    {formatPrice(item.price, item.currency, item.package_type)}
+                  </span>
                 </div>
                 <div>
                   <h3 className="font-heading text-3xl text-white">{item.title}</h3>

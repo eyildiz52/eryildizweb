@@ -2,11 +2,32 @@ import { fallbackPackages, fallbackVideos } from "./data/fallback";
 import type { PlatformVideo, SoftwarePackage } from "./types";
 import { getSupabaseAdminClient } from "./supabase/admin";
 
+const SUPABASE_QUERY_TIMEOUT_MS = Number(process.env.SUPABASE_QUERY_TIMEOUT_MS ?? "4000");
+
 const PLACEHOLDER_VIDEO_URLS = new Set([
   "https://www.youtube.com/watch?v=ysz5S6PUM-U",
   "https://www.youtube.com/watch?v=jNQXAC9IVRw",
 ]);
 const OFFICIAL_VIDEO_URL = "https://www.youtube.com/watch?v=ARrIYQLSGVs";
+
+async function runTimedQuery<T>(query: (signal: AbortSignal) => Promise<{ data: T | null; error: unknown }>) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SUPABASE_QUERY_TIMEOUT_MS);
+
+  try {
+    const { data, error } = await query(controller.signal);
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function sanitizeExternalUrl(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -33,18 +54,18 @@ function sanitizeExternalUrl(value: unknown): string | null {
 function normalizePackage(item: SoftwarePackage): SoftwarePackage {
   const sanitizedDemoUrl = sanitizeExternalUrl(item.demo_url);
 
-  if (
-    item.slug === "on-muhasebe-demo" &&
-    sanitizedDemoUrl &&
-    PLACEHOLDER_VIDEO_URLS.has(sanitizedDemoUrl)
-  ) {
+  if (item.slug === "on-muhasebe-demo") {
     return {
       ...item,
-      demo_url: OFFICIAL_VIDEO_URL,
+      title: "Er Kaynak Log",
+      short_description: "Celik, boru, kaynakci takibi ve laboratuvar NDT dokumanlarini merkezi yoneten izleme paketi.",
+      long_description:
+        "Kaynak operasyonlarinda celik ve boru lotlarini, kaynakci performansini, laboratuvar NDT kayitlarini ve denetim dokumanlarini izlenebilir bir yapiyla yonetin.",
+      demo_url: sanitizedDemoUrl ?? OFFICIAL_VIDEO_URL,
     };
   }
 
-  if (!sanitizedDemoUrl && item.slug !== "on-muhasebe-demo") {
+  if (!sanitizedDemoUrl) {
     return item;
   }
 
@@ -81,13 +102,16 @@ export async function getActivePackages(): Promise<SoftwarePackage[]> {
     return fallbackPackages.map(normalizePackage);
   }
 
-  const { data, error } = await admin
-    .from("software_packages")
-    .select("*")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
+  const data = await runTimedQuery<SoftwarePackage[]>(async (signal) =>
+    await admin
+      .from("software_packages")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .abortSignal(signal)
+  );
 
-  if (error || !data) {
+  if (!data) {
     return fallbackPackages.map(normalizePackage);
   }
 
@@ -109,13 +133,16 @@ export async function getPublishedVideos(): Promise<PlatformVideo[]> {
     return normalizedFallback;
   }
 
-  const { data, error } = await admin
-    .from("software_videos")
-    .select("*")
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+  const data = await runTimedQuery<PlatformVideo[]>(async (signal) =>
+    await admin
+      .from("software_videos")
+      .select("*")
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .abortSignal(signal)
+  );
 
-  if (error || !data) {
+  if (!data) {
     return normalizedFallback;
   }
 
@@ -138,18 +165,17 @@ export async function hasPaidAccess(userId: string, packageId: string): Promise<
     return false;
   }
 
-  const { data, error } = await admin
-    .from("orders")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("package_id", packageId)
-    .eq("payment_status", "paid")
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    return false;
-  }
+  const data = await runTimedQuery<{ id: string }>(async (signal) =>
+    await admin
+      .from("orders")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("package_id", packageId)
+      .eq("payment_status", "paid")
+      .limit(1)
+      .abortSignal(signal)
+      .maybeSingle()
+  );
 
   return Boolean(data?.id);
 }

@@ -169,7 +169,18 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     const entries = initialPackages.map((item) => [item.id, toDraftPackage(item)] as const);
     return Object.fromEntries(entries);
   });
-  const [packageDirtyMap, setPackageDirtyMap] = useState<Record<string, boolean>>({});
+  const [newPackage, setNewPackage] = useState<DraftPackage>({
+    package_type: "demo",
+    title: "",
+    short_description: "",
+    long_description: "",
+    price: "0",
+    currency: "TRY",
+    storage_bucket: "software-files",
+    storage_path: "",
+    demo_url: "",
+    is_active: true,
+  });
   const [userDrafts, setUserDrafts] = useState<Record<string, DraftUser>>(() => {
     const entries = initialUsers.map((user) => [user.id, toDraftUser(user)] as const);
     return Object.fromEntries(entries);
@@ -242,7 +253,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     setPackageDrafts(
       Object.fromEntries(nextPackages.map((item) => [item.id, toDraftPackage(item)]))
     );
-    setPackageDirtyMap({});
   };
 
   const updatePackageDraft = (id: string, next: Partial<DraftPackage>) => {
@@ -261,10 +271,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         },
       };
     });
-    setPackageDirtyMap((old) => ({
-      ...old,
-      [id]: true,
-    }));
   };
 
   const refreshUsers = async () => {
@@ -414,6 +420,89 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     }
   };
 
+  const createPackage = async () => {
+    if (!newPackage.title.trim()) {
+      writeMessage("Paket basligi zorunludur.");
+      return;
+    }
+    if (!newPackage.short_description.trim()) {
+      writeMessage("Kisa aciklama zorunludur.");
+      return;
+    }
+
+    setBusyKey("new-package");
+    try {
+      const res = await fetch("/api/admin/packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: newPackage.title.toLowerCase().replace(/\s+/g, "-"),
+          packageType: newPackage.package_type,
+          title: newPackage.title,
+          shortDescription: newPackage.short_description,
+          longDescription: newPackage.long_description || null,
+          price: Number(newPackage.price),
+          currency: newPackage.currency,
+          storageBucket: newPackage.storage_bucket,
+          storagePath: newPackage.storage_path,
+          demoUrl: newPackage.demo_url || null,
+          isActive: newPackage.is_active,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Paket olusturulamadi.");
+      }
+
+      setNewPackage({
+        package_type: "demo",
+        title: "",
+        short_description: "",
+        long_description: "",
+        price: "0",
+        currency: "TRY",
+        storage_bucket: "software-files",
+        storage_path: "",
+        demo_url: "",
+        is_active: true,
+      });
+      await refreshPackages();
+      writeMessage("Yeni paket olusturuldu.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Paket olusturulamadi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const deletePackage = async (id: string) => {
+    if (!window.confirm("Bu paketi silmek istediginize emin misiniz?")) {
+      return;
+    }
+
+    setBusyKey(`package-del-${id}`);
+    try {
+      const res = await fetch("/api/admin/packages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Paket silinemedi.");
+      }
+
+      await refreshPackages();
+      writeMessage("Paket silindi.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Paket silinemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const savePackage = async (id: string) => {
     const draft = packageDrafts[id];
     if (!draft) {
@@ -450,7 +539,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       }
 
       await refreshPackages();
-      setPackageDirtyMap((old) => ({ ...old, [id]: false }));
       writeMessage("Paket guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Paket guncellenemedi.");
@@ -565,7 +653,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       }));
 
       await refreshPackages();
-      setPackageDirtyMap((old) => ({ ...old, [item.id]: false }));
 
       writeMessage("Storage dosyasi silindi. Isterseniz simdi dogru dosyayi yukleyebilirsiniz.");
     } catch (error) {
@@ -804,17 +891,105 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
 
       <section className="feature-panel p-5">
         <h2 className="font-heading text-2xl text-white">Paket Yonetimi</h2>
+        <p className="mt-2 text-sm text-white/75">Yeni paketler ekleyin veya mevcut paketleri düzenleyin.</p>
+
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          <article className="feature-panel space-y-3 p-5">
+            <h3 className="font-heading text-lg text-white">Yeni Paket Ekle</h3>
+            <select
+              value={newPackage.package_type}
+              onChange={(event) =>
+                setNewPackage((old) => ({
+                  ...old,
+                  package_type: event.target.value === "paid" ? "paid" : "demo",
+                }))
+              }
+              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+            >
+              <option value="paid" className="bg-[#08111f] text-white">
+                Ucretli Paket
+              </option>
+              <option value="demo" className="bg-[#08111f] text-white">
+                Demo Paket
+              </option>
+            </select>
+            <input
+              value={newPackage.title}
+              onChange={(event) =>
+                setNewPackage((old) => ({ ...old, title: event.target.value }))
+              }
+              placeholder="Paket basligi"
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+            />
+            <input
+              value={newPackage.short_description}
+              onChange={(event) =>
+                setNewPackage((old) => ({ ...old, short_description: event.target.value }))
+              }
+              placeholder="Kisa aciklama"
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+            />
+            <textarea
+              value={newPackage.long_description}
+              onChange={(event) =>
+                setNewPackage((old) => ({ ...old, long_description: event.target.value }))
+              }
+              placeholder="Uzun aciklama (opsiyonel)"
+              rows={3}
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+            />
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                type="number"
+                value={newPackage.price}
+                onChange={(event) =>
+                  setNewPackage((old) => ({ ...old, price: event.target.value }))
+                }
+                placeholder="Fiyat"
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+              />
+              <input
+                value={newPackage.currency}
+                onChange={(event) =>
+                  setNewPackage((old) => ({ ...old, currency: event.target.value }))
+                }
+                placeholder="Para birimi"
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+              />
+            </div>
+            <input
+              value={newPackage.demo_url}
+              onChange={(event) =>
+                setNewPackage((old) => ({ ...old, demo_url: event.target.value }))
+              }
+              placeholder="Demo URL (opsiyonel)"
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+            />
+            <label className="inline-flex items-center gap-2 text-sm text-white/90">
+              <input
+                type="checkbox"
+                checked={newPackage.is_active}
+                onChange={(event) =>
+                  setNewPackage((old) => ({ ...old, is_active: event.target.checked }))
+                }
+              />
+              Paketi aktif olarak yayınla
+            </label>
+            <button
+              onClick={createPackage}
+              disabled={busyKey === "new-package"}
+              className="rounded-full bg-[#ffd166] px-5 py-2 text-sm font-semibold text-[#1f2937] disabled:opacity-60"
+            >
+              {busyKey === "new-package" ? "Kaydediliyor..." : "Yeni Paketi Ekle"}
+            </button>
+          </article>
+        </div>
+
+        <h3 className="font-heading text-lg text-white mt-6">Paket Listesi</h3>
         <div className="mt-4 space-y-4">
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
-            const hasPackageChanges = packageDirtyMap[item.id] || isPackageDraftDirty(item, draft);
-            if (item.id) {
-              console.log("DEBUG render package", item.id, {
-                packageDirtyMap: packageDirtyMap[item.id],
-                isPackageDraftDirty: isPackageDraftDirty(item, draft),
-                hasPackageChanges,
-              });
-            }
+            const canSave = draft.storage_bucket.trim() && draft.storage_path.trim();
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
                 <p className="text-xs text-white/60">
@@ -953,10 +1128,17 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                   </label>
                   <button
                     onClick={() => savePackage(item.id)}
-                    disabled={busyKey === `package-${item.id}` || !hasPackageChanges}
+                    disabled={busyKey === `package-${item.id}` || !canSave}
                     className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
                   >
                     Kaydet
+                  </button>
+                  <button
+                    onClick={() => deletePackage(item.id)}
+                    disabled={busyKey === `package-del-${item.id}`}
+                    className="rounded-full border border-red-300/45 bg-red-500/10 px-4 py-1.5 text-xs font-semibold text-red-200 disabled:opacity-60"
+                  >
+                    {busyKey === `package-del-${item.id}` ? "Siliniyor..." : "Paketi Sil"}
                   </button>
                 </div>
               </article>

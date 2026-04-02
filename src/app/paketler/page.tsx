@@ -50,8 +50,8 @@ function getDownloadLabel(status: OrderRow["payment_status"]) {
   return "Indirme: Iade sonrasi kapali";
 }
 
-function formatPrice(price: number, currency: string) {
-  if (!price) {
+function formatPrice(price: number, currency: string, packageType: "paid" | "demo") {
+  if (packageType === "demo") {
     return "Ucretsiz";
   }
 
@@ -98,7 +98,9 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
   const packageTitleById = new Map(packages.map((item) => [item.id, item.title]));
   const packageById = new Map(packages.map((item) => [item.id, item]));
   const paidPackages = packages.filter((item) => item.package_type === "paid");
-  const demoPackages = packages.filter((item) => item.package_type === "demo");
+  const demoPackages = packages.filter(
+    (item) => item.package_type === "demo" || item.slug === "on-muhasebe-demo"
+  );
 
   return (
     <main className="relative mx-auto w-full max-w-6xl px-6 py-12 md:px-10">
@@ -236,7 +238,12 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
 
       <section className="grid gap-5 md:grid-cols-2">
         {packages.map((item) => {
-          const marketing = getPackageMarketingContent(item.slug, item.title);
+          const isKaynakLog = item.slug === "on-muhasebe-demo";
+          const displayTitle = isKaynakLog ? "Er Kaynak Log" : item.title;
+          const marketing = getPackageMarketingContent(
+            isKaynakLog ? "er-kaynak-log" : item.slug,
+            displayTitle
+          );
 
           return (
             <article key={item.id} id={`pkg-${item.slug}`} className="feature-panel scroll-mt-24">
@@ -262,10 +269,12 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
 
               <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <h2 className="font-heading text-3xl text-white">{item.title}</h2>
+                  <h2 className="font-heading text-3xl text-white">{displayTitle}</h2>
                   <p className="mt-2 max-w-xl text-sm leading-7 text-white/78">{marketing.valueLine}</p>
                 </div>
-                <p className="text-2xl font-semibold text-[#ffd98a]">{formatPrice(item.price, item.currency)}</p>
+                <p className="text-2xl font-semibold text-[#ffd98a]">
+                  {formatPrice(item.price, item.currency, item.package_type)}
+                </p>
               </div>
 
               <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">

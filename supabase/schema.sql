@@ -244,9 +244,9 @@ insert into software_packages (
 values
   (
     'crm-lite',
-    'CRM Lite',
-    'Kucuk ve orta olcekli ekipler icin hizli musteri, teklif ve gorev takibi.',
-    'Musteri kartlari, teklif surecleri ve operasyon notlarini tek panelde yoneterek satis akisina hiz kazandirin.',
+    'Er Proje Yonetimi',
+    'Insaat projelerinin tum departmanlarini kapsayan kapsamli proje yonetimi paketi.',
+    'Planlama, saha ilerleme, ekip koordinasyonu ve raporlama adimlarini tek platformda yoneterek insaat projelerinde operasyonel kontrolu guclendirin.',
     'paid',
     1490,
     'TRY',
@@ -257,9 +257,9 @@ values
   ),
   (
     'stok-mini',
-    'Stok Mini',
-    'Kobi odakli stok giris-cikis, urun hareketi ve temel raporlama.',
-    'Depo veya magaza tarafinda urun hareketlerini sade bir arayuzle izlemek isteyen isletmeler icin pratik stok paketi.',
+    'Er Proje Yonetimi Mini',
+    'Insaat projelerinin tum departmanlarini kapsayan daha yalin proje yonetimi surumu.',
+    'Ana proje kontrol adimlarini hizli devreye almak isteyen ekipler icin sade arayuzle planlama, takip ve raporlama sureclerini birlestirir.',
     'paid',
     990,
     'TRY',

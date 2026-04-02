@@ -1,7 +1,7 @@
 export const homepageProofPoints = [
   {
     title: "Kuruluma Hazir Paketler",
-    text: "CRM, stok ve on muhasebe odakli urunleri tek vitrinde sergileyip dogrudan talep toplayin.",
+    text: "Proje yonetimi ve on muhasebe odakli urunleri tek vitrinde sergileyip dogrudan talep toplayin.",
   },
   {
     title: "Odeme Sonrasi Kontrollu Teslim",
@@ -86,23 +86,33 @@ type PackageMarketingContent = {
 
 const packageMarketingBySlug: Record<string, PackageMarketingContent> = {
   "crm-lite": {
-    badge: "Satis ve Musteri Takibi",
-    idealFor: "Teklif yoneten kucuk ekipler, bayi agi olan firmalar ve saha satisi yapan isletmeler",
-    valueLine: "Musteri, teklif ve gorev akislarini tek pencereden yonetmek isteyen firmalar icin hizli baslangic paketi.",
+    badge: "Insaat Proje Yonetimi",
+    idealFor: "Insaat projelerinde planlama, saha ve yonetim ekiplerini ortak akista bulusturmak isteyen firmalar",
+    valueLine: "Insaat projelerinin tum departmanlarini kapsayan merkezi yonetim yapisiyla surec takibini tek ekranda toplayin.",
     highlights: [
-      "Musteri karti ve gorusme notlari",
-      "Teklif sureci ve durum takibi",
-      "Ekip ici gorev akisi",
+      "Proje bazli departman koordinasyonu",
+      "Saha ilerleme ve is kalemi takibi",
+      "Yonetsel raporlama ve durum gorunurlugu",
     ],
   },
   "stok-mini": {
-    badge: "Stok ve Depo Kontrolu",
-    idealFor: "Kobi olceginde urun giris-cikis takibi yapan magazalar ve teknik servisler",
-    valueLine: "Karisik ERP kurmadan, stok hareketlerini ve temel raporlamayi hizli takip etmek isteyenler icin.",
+    badge: "Proje Yonetimi Mini",
+    idealFor: "Insaat projelerinde temel planlama ve takip ihtiyacini daha yalın bir paketle yonetmek isteyen ekipler",
+    valueLine: "Er Proje Yonetimi Mini ile proje akisinin ana adimlarini hizli kurup ekip uyumunu kaybetmeden ilerleyin.",
     highlights: [
-      "Urun giris-cikis hareketleri",
-      "Kritik stok takibi",
-      "Temel raporlama ve listeleme",
+      "Temel proje planlama ve gorev takibi",
+      "Sahadan hizli durum guncellemesi",
+      "Yalın ve hizli devreye alma yapisi",
+    ],
+  },
+  "er-kaynak-log": {
+    badge: "Kaynak ve NDT Log Yonetimi",
+    idealFor: "Celik, boru, kaynakci ve laboratuvar NDT dokuman takibini denetlenebilir sekilde yonetmek isteyen firmalar",
+    valueLine: "Er Kaynak Log ile uretim ve kalite tarafindaki kritik kaynak kayitlarini tek havuzda izlenebilir hale getirin.",
+    highlights: [
+      "Celik ve boru lot bazli takip",
+      "Kaynakci performans ve islem kayitlari",
+      "Laboratuvar NDT ve denetim dokuman yonetimi",
     ],
   },
   "on-muhasebe-demo": {
