@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -36,6 +36,8 @@ function getR2Client() {
       accessKeyId,
       secretAccessKey,
     },
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
 }
 
@@ -206,10 +208,33 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Silinecek storage yolu bulunamadi." }, { status: 400 });
   }
 
-  const { error } = await admin.storage.from(bucket).remove([path]);
+  if (STORAGE_PROVIDER === "r2") {
+    const r2Client = getR2Client();
+    const r2Bucket = process.env.R2_BUCKET || bucket;
 
-  if (error) {
-    return NextResponse.json({ error: error.message || "Dosya silinemedi." }, { status: 500 });
+    if (!r2Client || !r2Bucket) {
+      return NextResponse.json({ error: "R2 ayarlari eksik." }, { status: 503 });
+    }
+
+    try {
+      await r2Client.send(
+        new DeleteObjectCommand({
+          Bucket: r2Bucket,
+          Key: path,
+        })
+      );
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "R2 dosyasi silinemedi." },
+        { status: 500 }
+      );
+    }
+  } else {
+    const { error } = await admin.storage.from(bucket).remove([path]);
+
+    if (error) {
+      return NextResponse.json({ error: error.message || "Dosya silinemedi." }, { status: 500 });
+    }
   }
 
   const { error: updateError } = await admin
