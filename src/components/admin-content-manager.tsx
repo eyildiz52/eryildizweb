@@ -623,15 +623,29 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(ticketData.error ?? "Upload izni alinamadi.");
       }
 
-      const { error: uploadError } = await supabase.storage
-        .from(ticketData.bucket)
-        .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: true,
+      if (typeof ticketData.uploadUrl === "string" && ticketData.uploadUrl) {
+        const uploadRes = await fetch(ticketData.uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+          },
+          body: file,
         });
 
-      if (uploadError) {
-        throw new Error(uploadError.message);
+        if (!uploadRes.ok) {
+          throw new Error(`Dosya yuklenemedi. HTTP ${uploadRes.status}`);
+        }
+      } else {
+        const { error: uploadError } = await supabase.storage
+          .from(ticketData.bucket)
+          .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
+            contentType: file.type || "application/octet-stream",
+            upsert: true,
+          });
+
+        if (uploadError) {
+          throw new Error(uploadError.message);
+        }
       }
 
       const persistRes = await fetch("/api/admin/packages", {

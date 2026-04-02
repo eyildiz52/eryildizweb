@@ -1,7 +1,31 @@
 import { NextResponse } from "next/server";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getPackageBySlug, hasPaidAccess } from "@/lib/platform-data";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+
+const STORAGE_PROVIDER = (process.env.OBJECT_STORAGE_PROVIDER ?? "supabase").toLowerCase();
+
+function getR2Client() {
+  const endpoint = process.env.R2_ENDPOINT;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    return null;
+  }
+
+  return new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
+}
 
 export async function POST(
   _request: Request,
@@ -51,23 +75,55 @@ export async function POST(
     }
   }
 
-  const { data, error } = await admin.storage
-    .from(softwarePackage.storage_bucket)
-    .createSignedUrl(softwarePackage.storage_path, 60 * 10);
+  let downloadUrl: string | null = null;
 
-  if (error || !data?.signedUrl) {
-    const errorDetail =
-      error?.message ??
-      `Bucket: ${softwarePackage.storage_bucket}, Path: ${softwarePackage.storage_path}`;
+  if (STORAGE_PROVIDER === "r2") {
+    const r2Client = getR2Client();
+    const r2Bucket = process.env.R2_BUCKET || softwarePackage.storage_bucket;
 
-    return NextResponse.json(
-      {
-        error:
-          "Dosya linki olusturulamadi. Muhtemelen dosya Storage'a yuklenmedi veya yol hatali.",
-        detail: errorDetail,
-      },
-      { status: 500 }
-    );
+    if (!r2Client || !r2Bucket) {
+      return NextResponse.json({ error: "R2 ayarlari eksik." }, { status: 503 });
+    }
+
+    try {
+      downloadUrl = await getSignedUrl(
+        r2Client,
+        new GetObjectCommand({
+          Bucket: r2Bucket,
+          Key: softwarePackage.storage_path,
+        }),
+        { expiresIn: 60 * 10 }
+      );
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: "R2 indirme linki olusturulamadi.",
+          detail: error instanceof Error ? error.message : "Bilinmeyen hata",
+        },
+        { status: 500 }
+      );
+    }
+  } else {
+    const { data, error } = await admin.storage
+      .from(softwarePackage.storage_bucket)
+      .createSignedUrl(softwarePackage.storage_path, 60 * 10);
+
+    if (error || !data?.signedUrl) {
+      const errorDetail =
+        error?.message ??
+        `Bucket: ${softwarePackage.storage_bucket}, Path: ${softwarePackage.storage_path}`;
+
+      return NextResponse.json(
+        {
+          error:
+            "Dosya linki olusturulamadi. Muhtemelen dosya Storage'a yuklenmedi veya yol hatali.",
+          detail: errorDetail,
+        },
+        { status: 500 }
+      );
+    }
+
+    downloadUrl = data.signedUrl;
   }
 
   if (user) {
@@ -77,5 +133,5 @@ export async function POST(
     });
   }
 
-  return NextResponse.json({ downloadUrl: data.signedUrl });
+  return NextResponse.json({ downloadUrl });
 }

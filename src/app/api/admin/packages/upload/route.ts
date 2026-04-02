@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -16,6 +18,27 @@ type DeletePackageFilePayload = {
 };
 
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024;
+const STORAGE_PROVIDER = (process.env.OBJECT_STORAGE_PROVIDER ?? "supabase").toLowerCase();
+
+function getR2Client() {
+  const endpoint = process.env.R2_ENDPOINT;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    return null;
+  }
+
+  return new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
+}
 
 function normalizeExtension(fileName: string) {
   const extension = fileName.split(".").pop()?.trim().toLowerCase() ?? "zip";
@@ -94,6 +117,40 @@ export async function POST(request: Request) {
   const bucket = softwarePackage.storage_bucket || "software-files";
   const path = suggestedPath || buildPackageStoragePath(softwarePackage.id, packageType, fileName);
 
+  if (STORAGE_PROVIDER === "r2") {
+    const r2Client = getR2Client();
+    const r2Bucket = process.env.R2_BUCKET || bucket;
+
+    if (!r2Client || !r2Bucket) {
+      return NextResponse.json({ error: "R2 ayarlari eksik." }, { status: 503 });
+    }
+
+    try {
+      const uploadUrl = await getSignedUrl(
+        r2Client,
+        new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: path,
+          ContentType: typeof payload.contentType === "string" ? payload.contentType : undefined,
+        }),
+        { expiresIn: 60 * 10 }
+      );
+
+      return NextResponse.json({
+        ok: true,
+        provider: "r2",
+        bucket: r2Bucket,
+        path,
+        uploadUrl,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "R2 upload izni olusturulamadi." },
+        { status: 500 }
+      );
+    }
+  }
+
   const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(path);
 
   if (error || !data?.token) {
@@ -102,6 +159,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    provider: "supabase",
     bucket,
     path,
     token: data.token,

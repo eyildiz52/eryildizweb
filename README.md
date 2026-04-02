@@ -45,6 +45,14 @@ Bu proje yazilim paketleri satabileceginiz, demolari dagitabildiginiz, videolar 
    - SALES_INBOX_EMAIL
 4. Supabase SQL Editor'da supabase/schema.sql dosyasini calistirin.
 5. Supabase Storage tarafinda software-files adli bucket olusturun.
+    - 100MB+ dosyalar icin Cloudflare R2 onerilir.
+    - R2 kullanacaksaniz su env degerlerini doldurun:
+       - OBJECT_STORAGE_PROVIDER=r2
+       - R2_ENDPOINT
+       - R2_ACCESS_KEY_ID
+       - R2_SECRET_ACCESS_KEY
+       - R2_BUCKET
+    - Supabase ile devam edecekseniz OBJECT_STORAGE_PROVIDER=supabase kalabilir.
 6. Gelistirme sunucusunu baslatin:
    - npm run dev
 7. Stripe webhook dinlemek icin (lokalde):
