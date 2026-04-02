@@ -626,35 +626,20 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(ticketData.error ?? "Upload izni alinamadi.");
       }
 
-      if (typeof ticketData.uploadUrl === "string" && ticketData.uploadUrl) {
-        const uploadRes = await fetch(ticketData.uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-          },
-          body: file,
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        throw new Error("Supabase browser ayarlari eksik.");
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from(ticketData.bucket)
+        .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: true,
         });
 
-        if (!uploadRes.ok) {
-          const uploadErrorText = await uploadRes.text();
-          throw new Error(uploadErrorText || `Dosya yuklenemedi. HTTP ${uploadRes.status}`);
-        }
-      } else {
-        const supabase = getSupabaseBrowserClient();
-        if (!supabase) {
-          throw new Error("Supabase browser ayarlari eksik.");
-        }
-
-        const { error: uploadError } = await supabase.storage
-          .from(ticketData.bucket)
-          .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
-            contentType: file.type || "application/octet-stream",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(uploadError.message);
-        }
+      if (uploadError) {
+        throw new Error(uploadError.message);
       }
 
       const persistRes = await fetch("/api/admin/packages", {
