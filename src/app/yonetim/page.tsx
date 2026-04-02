@@ -4,6 +4,22 @@ import { AdminContentManager } from "@/components/admin-content-manager";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
+type AdminPackageInput = {
+  id: string;
+  slug: string;
+  title: string;
+  short_description: string;
+  long_description: string | null;
+  package_type: "demo" | "paid";
+  price: number;
+  currency: string;
+  demo_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  storage_bucket?: string | null;
+  storage_path?: string | null;
+};
+
 export const metadata: Metadata = {
   title: "Yonetim | ER YILDIZ YAZILIM",
 };
@@ -49,7 +65,7 @@ export default async function AdminPage() {
       .order("created_at", { ascending: false }),
     admin
       .from("software_packages")
-      .select("id,slug,title,short_description,long_description,package_type,price,currency,demo_url,is_active,created_at")
+      .select("id,slug,title,short_description,long_description,package_type,price,currency,storage_bucket,storage_path,demo_url,is_active,created_at")
       .order("created_at", { ascending: false }),
     admin
       .from("profiles")
@@ -63,7 +79,11 @@ export default async function AdminPage() {
   ]);
 
   const videos = videosRes.data ?? [];
-  const packages = packagesRes.data ?? [];
+  const packages = ((packagesRes.data ?? []) as AdminPackageInput[]).map((item) => ({
+    ...item,
+    storage_bucket: item.storage_bucket ?? "software-files",
+    storage_path: item.storage_path ?? "",
+  }));
   const users = usersRes.data ?? [];
   const orders = ordersRes.data ?? [];
 
