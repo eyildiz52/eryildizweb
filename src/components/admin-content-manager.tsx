@@ -228,6 +228,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
   const [message, setMessage] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
   const [fileInputKeys, setFileInputKeys] = useState<Record<string, number>>({});
+  const [uploadProgressMap, setUploadProgressMap] = useState<Record<string, number>>({});
 
   const publishedCount = useMemo(
     () => videos.filter((item) => item.is_published).length,
@@ -248,6 +249,53 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       setMessage((current) => (current === text ? "" : current));
     }, 4000);
   };
+
+  const uploadViaSignedUrlWithProgress = async (
+    uploadUrl: string,
+    file: File,
+    packageId: string
+  ) =>
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.timeout = 1000 * 60 * 20;
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || event.total <= 0) {
+          return;
+        }
+
+        const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+        setUploadProgressMap((old) => ({
+          ...old,
+          [packageId]: percent,
+        }));
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgressMap((old) => ({
+            ...old,
+            [packageId]: 100,
+          }));
+          resolve();
+          return;
+        }
+
+        reject(new Error(xhr.responseText || `Dosya yuklenemedi. HTTP ${xhr.status}`));
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Baglanti hatasi nedeniyle yukleme tamamlanamadi."));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new Error("Yukleme zaman asimina ugradi."));
+      };
+
+      xhr.send(file);
+    });
 
   const refreshVideos = async () => {
     const res = await fetch("/api/admin/videos", { cache: "no-store" });
@@ -626,20 +674,38 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(ticketData.error ?? "Upload izni alinamadi.");
       }
 
-      const supabase = getSupabaseBrowserClient();
-      if (!supabase) {
-        throw new Error("Supabase browser ayarlari eksik.");
+      const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
+      const encodedPath = String(ticketData.path)
+        .split("/")
+        .map((part) => encodeURIComponent(part))
+        .join("/");
+      const signedUploadUrl =
+        typeof ticketData.token === "string" && ticketData.token && supabaseUrl
+          ? `${supabaseUrl}/storage/v1/object/upload/sign/${ticketData.bucket}/${encodedPath}?token=${encodeURIComponent(ticketData.token)}`
+          : "";
+
+      if (!signedUploadUrl) {
+        throw new Error("Imzali yukleme URL'i olusturulamadi.");
       }
 
-      const { error: uploadError } = await supabase.storage
-        .from(ticketData.bucket)
-        .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: true,
-        });
+      let uploadError: Error | null = null;
+
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          await uploadViaSignedUrlWithProgress(signedUploadUrl, file, item.id);
+          uploadError = null;
+          break;
+        } catch (error) {
+          uploadError = error instanceof Error ? error : new Error("Dosya yuklenemedi.");
+          if (attempt < 3) {
+            writeMessage(`Yukleme tekrar denenecek (${attempt}/3)...`);
+            await new Promise((resolve) => window.setTimeout(resolve, 1200 * attempt));
+          }
+        }
+      }
 
       if (uploadError) {
-        throw new Error(uploadError.message);
+        throw uploadError;
       }
 
       const persistRes = await fetch("/api/admin/packages", {
@@ -676,6 +742,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Dosya yuklenemedi.");
     } finally {
+      setUploadProgressMap((old) => ({ ...old, [item.id]: 0 }));
       setBusyKey("");
     }
   };
@@ -1050,6 +1117,100 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
               {busyKey === "new-package" ? "Kaydediliyor..." : "Yeni Paketi Ekle"}
             </button>
           </article>
+
+          <article className="feature-panel space-y-3 p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-heading text-lg text-white">Hizli Kullanici Denetimi</h3>
+              <button
+                onClick={refreshUsers}
+                className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85"
+              >
+                Yenile
+              </button>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                value={newUser.email}
+                onChange={(event) => setNewUser((old) => ({ ...old, email: event.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="E-posta *"
+                type="email"
+              />
+              <select
+                aria-label="Hizli yeni kullanici rolu"
+                value={newUser.role}
+                onChange={(event) =>
+                  setNewUser((old) => ({ ...old, role: event.target.value as "admin" | "member" }))
+                }
+                className="rounded-lg border border-white/20 bg-[#0f1b2d] px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <input
+                value={newUser.full_name}
+                onChange={(event) => setNewUser((old) => ({ ...old, full_name: event.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Ad Soyad"
+              />
+              <input
+                value={newUser.company_name}
+                onChange={(event) => setNewUser((old) => ({ ...old, company_name: event.target.value }))}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Firma"
+              />
+              <input
+                type="password"
+                value={newUser.password}
+                onChange={(event) => setNewUser((old) => ({ ...old, password: event.target.value }))}
+                className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                placeholder="Sifre * (en az 8 karakter)"
+              />
+            </div>
+
+            <button
+              onClick={createUser}
+              disabled={busyKey === "new-user"}
+              className="rounded-full bg-[#ffd166] px-4 py-2 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
+            >
+              {busyKey === "new-user" ? "Olusturuluyor..." : "Kullanici Olustur"}
+            </button>
+
+            <div className="space-y-2 border-t border-white/10 pt-3">
+              {users.slice(0, 6).map((user) => {
+                const draft = userDrafts[user.id] ?? toDraftUser(user);
+                return (
+                  <div key={user.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                    <p className="truncate text-xs text-white/70">{user.email}</p>
+                    <div className="mt-2 flex gap-2">
+                      <select
+                        aria-label={`${user.email} hizli rol`}
+                        value={draft.role}
+                        onChange={(event) =>
+                          setUserDrafts((old) => ({
+                            ...old,
+                            [user.id]: { ...draft, role: event.target.value as "admin" | "member" },
+                          }))
+                        }
+                        className="flex-1 rounded-lg border border-white/20 bg-[#0f1b2d] px-2 py-1.5 text-xs text-white outline-none"
+                      >
+                        <option value="member">Member</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button
+                        onClick={() => saveUser(user.id)}
+                        disabled={busyKey === `user-${user.id}`}
+                        className="rounded-lg bg-[#ffd166] px-3 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
+                      >
+                        Kaydet
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
         </div>
 
         <h3 className="font-heading text-lg text-white mt-6">Paket Listesi</h3>
@@ -1061,6 +1222,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
               busyKey === `delete-upload-${item.id}` ||
               busyKey === `package-${item.id}` ||
               busyKey === `package-del-${item.id}`;
+            const uploadProgress = uploadProgressMap[item.id] ?? 0;
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
                 <p className="text-xs text-white/60">
@@ -1199,6 +1361,16 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                       {busyKey === `delete-upload-${item.id}` ? "Siliniyor..." : "Mevcut Dosyayi Sil"}
                     </button>
                   </div>
+                  {busyKey === `upload-${item.id}` ? (
+                    <div className="mt-2">
+                      <progress
+                        value={uploadProgress}
+                        max={100}
+                        className="h-2 w-full overflow-hidden rounded-full"
+                      />
+                      <p className="mt-1 text-xs text-white/65">Yukleme: %{uploadProgress}</p>
+                    </div>
+                  ) : null}
                   <p className="mt-2 text-xs leading-6 text-white/65">
                     Dosya tarayicidan dogrudan object storage&apos;a gider. Yukleme bitince paketin indirme yolu otomatik guncellenir.
                   </p>
