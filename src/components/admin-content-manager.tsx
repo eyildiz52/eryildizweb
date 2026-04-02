@@ -519,9 +519,21 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
 
     const storageBucket = draft.storage_bucket.trim();
     const storagePath = draft.storage_path.trim();
-    if (!storageBucket || !storagePath) {
-      writeMessage("Kaydetmeden once storage bucket ve storage path dolu olmalidir.");
-      return;
+    const payload: Record<string, unknown> = {
+      id,
+      packageType: draft.package_type,
+      title: draft.title,
+      shortDescription: draft.short_description,
+      longDescription: draft.long_description,
+      price: Number(draft.price),
+      currency: draft.currency,
+      demoUrl: draft.demo_url,
+      isActive: draft.is_active,
+    };
+
+    if (storagePath) {
+      payload.storageBucket = storageBucket || "software-files";
+      payload.storagePath = storagePath;
     }
 
     setBusyKey(`package-${id}`);
@@ -529,19 +541,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       const res = await fetch("/api/admin/packages", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          packageType: draft.package_type,
-          title: draft.title,
-          shortDescription: draft.short_description,
-          longDescription: draft.long_description,
-          price: Number(draft.price),
-          currency: draft.currency,
-          storageBucket,
-          storagePath,
-          demoUrl: draft.demo_url,
-          isActive: draft.is_active,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const contentType = res.headers.get("content-type") ?? "";
