@@ -591,16 +591,10 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       }
 
       // Upload sadece Storage'a yapilir; DB'ye yazmak icin kullanici Kaydet'e basar.
-      console.log("DEBUG uploadPackageFile: updatePackageDraft calling with", {
-        id: item.id,
-        bucket: ticketData.bucket,
-        path: ticketData.path,
-      });
       updatePackageDraft(item.id, {
         storage_bucket: ticketData.bucket,
         storage_path: ticketData.path,
       });
-      console.log("DEBUG uploadPackageFile: updatePackageDraft called, packageDirtyMap should have", item.id, "set to true");
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
@@ -897,6 +891,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           <article className="feature-panel space-y-3 p-5">
             <h3 className="font-heading text-lg text-white">Yeni Paket Ekle</h3>
             <select
+              aria-label="Yeni paket tipi"
               value={newPackage.package_type}
               onChange={(event) =>
                 setNewPackage((old) => ({
@@ -990,6 +985,11 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
             const canSave = draft.storage_bucket.trim() && draft.storage_path.trim();
+            const isRowBusy =
+              busyKey === `upload-${item.id}` ||
+              busyKey === `delete-upload-${item.id}` ||
+              busyKey === `package-${item.id}` ||
+              busyKey === `package-del-${item.id}`;
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
                 <p className="text-xs text-white/60">
@@ -1128,14 +1128,14 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                   </label>
                   <button
                     onClick={() => savePackage(item.id)}
-                    disabled={busyKey === `package-${item.id}` || !canSave}
+                    disabled={isRowBusy || !canSave}
                     className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
                   >
                     Kaydet
                   </button>
                   <button
                     onClick={() => deletePackage(item.id)}
-                    disabled={busyKey === `package-del-${item.id}`}
+                    disabled={isRowBusy}
                     className="rounded-full border border-red-300/45 bg-red-500/10 px-4 py-1.5 text-xs font-semibold text-red-200 disabled:opacity-60"
                   >
                     {busyKey === `package-del-${item.id}` ? "Siliniyor..." : "Paketi Sil"}
