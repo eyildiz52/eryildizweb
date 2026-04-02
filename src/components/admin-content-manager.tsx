@@ -122,6 +122,30 @@ function toDraftUser(user: AdminUser): DraftUser {
   };
 }
 
+function normalizeExtension(fileName: string) {
+  const extension = fileName.split(".").pop()?.trim().toLowerCase() ?? "zip";
+  return extension ? extension.replace(/[^a-z0-9]/g, "") || "zip" : "zip";
+}
+
+function normalizeBaseName(fileName: string) {
+  const withoutExtension = fileName.replace(/\.[^/.]+$/, "");
+  const safe = withoutExtension
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return safe || "paket";
+}
+
+function buildPackageStoragePath(packageId: string, packageType: "demo" | "paid", fileName: string) {
+  const extension = normalizeExtension(fileName);
+  const baseName = normalizeBaseName(fileName);
+  const folder = packageType === "demo" ? "demo" : "paid";
+  return `${folder}/${packageId}/${baseName}.${extension}`;
+}
+
 function isPackageDraftDirty(item: AdminPackage, draft: DraftPackage) {
   const original = toDraftPackage(item);
   return (
@@ -566,6 +590,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
 
   const uploadPackageFile = async (item: AdminPackage) => {
     const file = selectedFiles[item.id];
+    const draft = packageDrafts[item.id] ?? toDraftPackage(item);
     if (!file) {
       writeMessage("Once yüklenecek dosyayi secin.");
       return;
@@ -585,9 +610,11 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           packageId: item.id,
+          packageType: draft.package_type,
           fileName: file.name,
           contentType: file.type,
           fileSize: file.size,
+          suggestedPath: draft.storage_path,
         }),
       });
 
@@ -1124,12 +1151,29 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                       key={fileInputKeys[item.id] ?? 0}
                       type="file"
                       aria-label={`${item.slug} dosya yukleme`}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const nextFile = event.target.files?.[0] ?? null;
                         setSelectedFiles((old) => ({
                           ...old,
-                          [item.id]: event.target.files?.[0] ?? null,
-                        }))
-                      }
+                          [item.id]: nextFile,
+                        }));
+
+                        if (!nextFile) {
+                          return;
+                        }
+
+                        const nextBucket = draft.storage_bucket.trim() || "software-files";
+                        const nextPath = buildPackageStoragePath(
+                          item.id,
+                          draft.package_type,
+                          nextFile.name
+                        );
+
+                        updatePackageDraft(item.id, {
+                          storage_bucket: nextBucket,
+                          storage_path: nextPath,
+                        });
+                      }}
                       className="block w-full text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#ffd166] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#1f2937]"
                     />
                     <button

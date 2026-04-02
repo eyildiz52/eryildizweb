@@ -4,9 +4,11 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SignedUploadPayload = {
   packageId?: string;
+  packageType?: "demo" | "paid";
   fileName?: string;
   contentType?: string;
   fileSize?: number;
+  suggestedPath?: string;
 };
 
 type DeletePackageFilePayload = {
@@ -32,6 +34,13 @@ function normalizeBaseName(fileName: string) {
   return safe || "paket";
 }
 
+function buildPackageStoragePath(packageId: string, packageType: "demo" | "paid", fileName: string) {
+  const extension = normalizeExtension(fileName);
+  const baseName = normalizeBaseName(fileName);
+  const folder = packageType === "demo" ? "demo" : "paid";
+  return `${folder}/${packageId}/${baseName}.${extension}`;
+}
+
 export async function POST(request: Request) {
   const access = await requireAdminAccess();
   if (!access.ok) {
@@ -51,8 +60,10 @@ export async function POST(request: Request) {
   }
 
   const packageId = typeof payload.packageId === "string" ? payload.packageId.trim() : "";
+  const packageType = payload.packageType === "paid" ? "paid" : "demo";
   const fileName = typeof payload.fileName === "string" ? payload.fileName.trim() : "";
   const fileSize = Number(payload.fileSize ?? 0);
+  const suggestedPath = typeof payload.suggestedPath === "string" ? payload.suggestedPath.trim() : "";
 
   if (!packageId) {
     return NextResponse.json({ error: "packageId zorunludur." }, { status: 400 });
@@ -80,11 +91,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paket bulunamadi." }, { status: 404 });
   }
 
-  const extension = normalizeExtension(fileName);
-  const baseName = normalizeBaseName(fileName);
-  const folder = softwarePackage.package_type === "demo" ? "demo" : "paid";
   const bucket = softwarePackage.storage_bucket || "software-files";
-  const path = `${folder}/${softwarePackage.id}/${Date.now()}-${baseName}.${extension}`;
+  const path = suggestedPath || buildPackageStoragePath(softwarePackage.id, packageType, fileName);
 
   const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(path);
 
