@@ -273,6 +273,14 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     });
   };
 
+  const applyPackageSnapshot = (pkg: AdminPackage) => {
+    setPackages((old) => old.map((item) => (item.id === pkg.id ? pkg : item)));
+    setPackageDrafts((old) => ({
+      ...old,
+      [pkg.id]: toDraftPackage(pkg),
+    }));
+  };
+
   const refreshUsers = async () => {
     const res = await fetch("/api/admin/users", { cache: "no-store" });
     const data = await res.json();
@@ -545,7 +553,9 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(data.error ?? `Paket guncellenemedi. HTTP ${res.status}`);
       }
 
-      await refreshPackages();
+      if (data?.package) {
+        applyPackageSnapshot(data.package as AdminPackage);
+      }
       writeMessage("Paket guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Paket guncellenemedi.");
@@ -602,6 +612,17 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         storage_bucket: ticketData.bucket,
         storage_path: ticketData.path,
       });
+      setPackages((old) =>
+        old.map((pkg) =>
+          pkg.id === item.id
+            ? {
+                ...pkg,
+                storage_bucket: ticketData.bucket,
+                storage_path: ticketData.path,
+              }
+            : pkg
+        )
+      );
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
@@ -652,8 +673,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           storage_path: "",
         },
       }));
-
-      await refreshPackages();
 
       writeMessage("Storage dosyasi silindi. Isterseniz simdi dogru dosyayi yukleyebilirsiniz.");
     } catch (error) {
