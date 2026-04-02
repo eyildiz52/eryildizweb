@@ -4,6 +4,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getPackageBySlug, hasPaidAccess } from "@/lib/platform-data";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAdminAccess } from "@/lib/admin-access";
 
 const STORAGE_PROVIDER = (process.env.OBJECT_STORAGE_PROVIDER ?? "supabase").toLowerCase();
 
@@ -66,12 +67,17 @@ export async function POST(
       );
     }
 
-    const allowed = await hasPaidAccess(user.id, softwarePackage.id);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "Bu paketi indirmek icin odeme onayi gerekli." },
-        { status: 403 }
-      );
+    const adminAccess = await requireAdminAccess();
+    const isAdmin = adminAccess.ok;
+
+    if (!isAdmin) {
+      const allowed = await hasPaidAccess(user.id, softwarePackage.id);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "Bu paketi indirmek icin odeme onayi gerekli." },
+          { status: 403 }
+        );
+      }
     }
   }
 
