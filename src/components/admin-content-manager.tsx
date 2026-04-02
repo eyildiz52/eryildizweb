@@ -502,46 +502,15 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(uploadError.message);
       }
 
-      const saveRes = await fetch("/api/admin/packages", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: item.id,
-          storageBucket: ticketData.bucket,
-          storagePath: ticketData.path,
-        }),
+      // Upload sadece Storage'a yapilir; DB'ye yazmak icin kullanici Kaydet'e basar.
+      updatePackageDraft(item.id, {
+        storage_bucket: ticketData.bucket,
+        storage_path: ticketData.path,
       });
-
-      const saveData = await saveRes.json();
-      if (!saveRes.ok) {
-        throw new Error(saveData.error ?? "Paket storage yolu guncellenemedi.");
-      }
-
-      setPackages((old) =>
-        old.map((pkg) =>
-          pkg.id === item.id
-            ? {
-                ...pkg,
-                storage_bucket: ticketData.bucket,
-                storage_path: ticketData.path,
-              }
-            : pkg
-        )
-      );
-      setPackageDrafts((old) => ({
-        ...old,
-        [item.id]: {
-          ...(old[item.id] ?? toDraftPackage(item)),
-          storage_bucket: ticketData.bucket,
-          storage_path: ticketData.path,
-        },
-      }));
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
-      await refreshPackages();
-      setPackageDirtyMap((old) => ({ ...old, [item.id]: false }));
-      writeMessage("Dosya yüklendi ve paket indirme yolu guncellendi.");
+      writeMessage("Dosya Storage'a yuklendi. Kalici yapmak icin Kaydet'e basin.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Dosya yuklenemedi.");
     } finally {
