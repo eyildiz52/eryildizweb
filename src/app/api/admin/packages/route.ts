@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -41,29 +40,6 @@ function cleanOptionalUrl(value: unknown): string | null {
   } catch {
     return null;
   }
-}
-
-const STORAGE_PROVIDER = (process.env.OBJECT_STORAGE_PROVIDER ?? "supabase").toLowerCase();
-
-function getR2Client() {
-  const endpoint = process.env.R2_ENDPOINT;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    return null;
-  }
-
-  return new S3Client({
-    region: "auto",
-    endpoint,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
 }
 
 export async function GET() {
@@ -195,29 +171,6 @@ export async function PATCH(request: Request) {
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Guncelleme alani yok." }, { status: 400 });
-  }
-
-  if (STORAGE_PROVIDER === "r2" && updates.storage_path) {
-    const r2Client = getR2Client();
-    const r2Bucket = process.env.R2_BUCKET || updates.storage_bucket;
-
-    if (!r2Client || !r2Bucket) {
-      return NextResponse.json({ error: "R2 ayarlari eksik." }, { status: 503 });
-    }
-
-    try {
-      await r2Client.send(
-        new HeadObjectCommand({
-          Bucket: r2Bucket,
-          Key: updates.storage_path,
-        })
-      );
-    } catch {
-      return NextResponse.json(
-        { error: "R2 yuklemesi dogrulanamadi. Dosya bucket icinde bulunamadi." },
-        { status: 400 }
-      );
-    }
   }
 
   const { data, error } = await admin

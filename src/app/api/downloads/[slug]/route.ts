@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getPackageBySlug, hasPaidAccess } from "@/lib/platform-data";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -82,6 +82,13 @@ export async function POST(
     }
   }
 
+  if (!softwarePackage.storage_bucket || !softwarePackage.storage_path) {
+    return NextResponse.json(
+      { error: "Bu paket icin kayitli indirme dosyasi bulunamadi." },
+      { status: 400 }
+    );
+  }
+
   let downloadUrl: string | null = null;
 
   if (STORAGE_PROVIDER === "r2") {
@@ -93,13 +100,6 @@ export async function POST(
     }
 
     try {
-      await r2Client.send(
-        new HeadObjectCommand({
-          Bucket: r2Bucket,
-          Key: softwarePackage.storage_path,
-        })
-      );
-
       downloadUrl = await getSignedUrl(
         r2Client,
         new GetObjectCommand({
@@ -111,7 +111,7 @@ export async function POST(
     } catch (error) {
       return NextResponse.json(
         {
-          error: "R2 dosyasi bulunamadi veya indirme linki olusturulamadi.",
+          error: "R2 indirme linki olusturulamadi.",
           detail: error instanceof Error ? error.message : "Bilinmeyen hata",
         },
         { status: 500 }

@@ -596,15 +596,18 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       return;
     }
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      writeMessage("Supabase browser ayarlari eksik.");
-      return;
-    }
-
     setBusyKey(`upload-${item.id}`);
 
     try {
+      const computedPath = draft.storage_path.trim()
+        ? draft.storage_path.trim()
+        : buildPackageStoragePath(item.id, draft.package_type, file.name);
+
+      updatePackageDraft(item.id, {
+        storage_bucket: draft.storage_bucket.trim() || "software-files",
+        storage_path: computedPath,
+      });
+
       const ticketRes = await fetch("/api/admin/packages/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -614,7 +617,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           fileName: file.name,
           contentType: file.type,
           fileSize: file.size,
-          suggestedPath: draft.storage_path,
+          suggestedPath: computedPath,
         }),
       });
 
@@ -633,9 +636,15 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         });
 
         if (!uploadRes.ok) {
-          throw new Error(`Dosya yuklenemedi. HTTP ${uploadRes.status}`);
+          const uploadErrorText = await uploadRes.text();
+          throw new Error(uploadErrorText || `Dosya yuklenemedi. HTTP ${uploadRes.status}`);
         }
       } else {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) {
+          throw new Error("Supabase browser ayarlari eksik.");
+        }
+
         const { error: uploadError } = await supabase.storage
           .from(ticketData.bucket)
           .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
@@ -1206,7 +1215,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     </button>
                   </div>
                   <p className="mt-2 text-xs leading-6 text-white/65">
-                    Dosya tarayicidan dogrudan Supabase Storage&apos;a gider. Yukleme bitince paketin indirme yolu otomatik guncellenir.
+                    Dosya tarayicidan dogrudan object storage&apos;a gider. Yukleme bitince paketin indirme yolu otomatik guncellenir.
                   </p>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
