@@ -509,6 +509,13 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       return;
     }
 
+    const storageBucket = draft.storage_bucket.trim();
+    const storagePath = draft.storage_path.trim();
+    if (!storageBucket || !storagePath) {
+      writeMessage("Kaydetmeden once storage bucket ve storage path dolu olmalidir.");
+      return;
+    }
+
     setBusyKey(`package-${id}`);
     try {
       const res = await fetch("/api/admin/packages", {
@@ -522,8 +529,8 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           longDescription: draft.long_description,
           price: Number(draft.price),
           currency: draft.currency,
-          storageBucket: draft.storage_bucket,
-          storagePath: draft.storage_path,
+          storageBucket,
+          storagePath,
           demoUrl: draft.demo_url,
           isActive: draft.is_active,
         }),
@@ -984,7 +991,6 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         <div className="mt-4 space-y-4">
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
-            const canSave = draft.storage_bucket.trim() && draft.storage_path.trim();
             const isRowBusy =
               busyKey === `upload-${item.id}` ||
               busyKey === `delete-upload-${item.id}` ||
@@ -1128,7 +1134,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                   </label>
                   <button
                     onClick={() => savePackage(item.id)}
-                    disabled={isRowBusy || !canSave}
+                    disabled={isRowBusy}
                     className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
                   >
                     Kaydet
