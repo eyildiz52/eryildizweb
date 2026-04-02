@@ -169,6 +169,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     const entries = initialPackages.map((item) => [item.id, toDraftPackage(item)] as const);
     return Object.fromEntries(entries);
   });
+  const [packageDirtyMap, setPackageDirtyMap] = useState<Record<string, boolean>>({});
   const [userDrafts, setUserDrafts] = useState<Record<string, DraftUser>>(() => {
     const entries = initialUsers.map((user) => [user.id, toDraftUser(user)] as const);
     return Object.fromEntries(entries);
@@ -241,6 +242,29 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
     setPackageDrafts(
       Object.fromEntries(nextPackages.map((item) => [item.id, toDraftPackage(item)]))
     );
+    setPackageDirtyMap({});
+  };
+
+  const updatePackageDraft = (id: string, next: Partial<DraftPackage>) => {
+    setPackageDrafts((old) => {
+      const fallbackPackage = packages.find((item) => item.id === id);
+      if (!old[id] && !fallbackPackage) {
+        return old;
+      }
+
+      const current = old[id] ?? toDraftPackage(fallbackPackage as AdminPackage);
+      return {
+        ...old,
+        [id]: {
+          ...current,
+          ...next,
+        },
+      };
+    });
+    setPackageDirtyMap((old) => ({
+      ...old,
+      [id]: true,
+    }));
   };
 
   const refreshUsers = async () => {
@@ -426,6 +450,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       }
 
       await refreshPackages();
+      setPackageDirtyMap((old) => ({ ...old, [id]: false }));
       writeMessage("Paket guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Paket guncellenemedi.");
@@ -514,6 +539,8 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
+      await refreshPackages();
+      setPackageDirtyMap((old) => ({ ...old, [item.id]: false }));
       writeMessage("Dosya yüklendi ve paket indirme yolu guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Dosya yuklenemedi.");
@@ -561,6 +588,9 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           storage_path: "",
         },
       }));
+
+      await refreshPackages();
+      setPackageDirtyMap((old) => ({ ...old, [item.id]: false }));
 
       writeMessage("Storage dosyasi silindi. Isterseniz simdi dogru dosyayi yukleyebilirsiniz.");
     } catch (error) {
@@ -802,7 +832,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         <div className="mt-4 space-y-4">
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
-            const hasPackageChanges = isPackageDraftDirty(item, draft);
+            const hasPackageChanges = packageDirtyMap[item.id] || isPackageDraftDirty(item, draft);
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
                 <p className="text-xs text-white/60">
@@ -814,13 +844,9 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} paket tipi`}
                     value={draft.package_type}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: {
-                          ...draft,
-                          package_type: event.target.value === "paid" ? "paid" : "demo",
-                        },
-                      }))
+                      updatePackageDraft(item.id, {
+                        package_type: event.target.value === "paid" ? "paid" : "demo",
+                      })
                     }
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   >
@@ -831,10 +857,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} paket basligi`}
                     value={draft.title}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, title: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { title: event.target.value })
                     }
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
@@ -842,10 +865,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} para birimi`}
                     value={draft.currency}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, currency: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { currency: event.target.value })
                     }
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
@@ -853,10 +873,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} kisa aciklama`}
                     value={draft.short_description}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, short_description: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { short_description: event.target.value })
                     }
                     className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
@@ -864,10 +881,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} uzun aciklama`}
                     value={draft.long_description}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, long_description: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { long_description: event.target.value })
                     }
                     rows={3}
                     className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
@@ -876,10 +890,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} fiyat`}
                     value={draft.price}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, price: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { price: event.target.value })
                     }
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
@@ -887,10 +898,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} storage bucket`}
                     value={draft.storage_bucket}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, storage_bucket: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { storage_bucket: event.target.value })
                     }
                     placeholder="Storage Bucket"
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
@@ -899,10 +907,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     aria-label={`${item.slug} storage path`}
                     value={draft.storage_path}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, storage_path: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { storage_path: event.target.value })
                     }
                     placeholder="Storage Path"
                     className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
@@ -910,10 +915,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                   <input
                     value={draft.demo_url}
                     onChange={(event) =>
-                      setPackageDrafts((old) => ({
-                        ...old,
-                        [item.id]: { ...draft, demo_url: event.target.value },
-                      }))
+                      updatePackageDraft(item.id, { demo_url: event.target.value })
                     }
                     placeholder="Demo URL"
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
@@ -962,10 +964,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                       type="checkbox"
                       checked={draft.is_active}
                       onChange={(event) =>
-                        setPackageDrafts((old) => ({
-                          ...old,
-                          [item.id]: { ...draft, is_active: event.target.checked },
-                        }))
+                        updatePackageDraft(item.id, { is_active: event.target.checked })
                       }
                     />
                     Paket aktif
