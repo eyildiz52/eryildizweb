@@ -607,26 +607,37 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         throw new Error(uploadError.message);
       }
 
-      // Upload sadece Storage'a yapilir; DB'ye yazmak icin kullanici Kaydet'e basar.
-      updatePackageDraft(item.id, {
-        storage_bucket: ticketData.bucket,
-        storage_path: ticketData.path,
+      const persistRes = await fetch("/api/admin/packages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          storageBucket: ticketData.bucket,
+          storagePath: ticketData.path,
+        }),
       });
-      setPackages((old) =>
-        old.map((pkg) =>
-          pkg.id === item.id
-            ? {
-                ...pkg,
-                storage_bucket: ticketData.bucket,
-                storage_path: ticketData.path,
-              }
-            : pkg
-        )
-      );
+
+      const persistContentType = persistRes.headers.get("content-type") ?? "";
+      const persistData = persistContentType.includes("application/json")
+        ? await persistRes.json()
+        : { error: `Sunucu beklenmeyen bir yanit dondurdu. HTTP ${persistRes.status}` };
+
+      if (!persistRes.ok) {
+        throw new Error(persistData.error ?? `Yuklenen dosya yolu kaydedilemedi. HTTP ${persistRes.status}`);
+      }
+
+      if (persistData?.package) {
+        applyPackageSnapshot(persistData.package as AdminPackage);
+      } else {
+        updatePackageDraft(item.id, {
+          storage_bucket: ticketData.bucket,
+          storage_path: ticketData.path,
+        });
+      }
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
-      writeMessage("Dosya Storage'a yuklendi. Kalici yapmak icin Kaydet'e basin.");
+      writeMessage("Dosya Storage'a yuklendi ve paket yoluna kaydedildi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Dosya yuklenemedi.");
     } finally {
