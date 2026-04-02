@@ -503,10 +503,16 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
       }
 
       // Upload sadece Storage'a yapilir; DB'ye yazmak icin kullanici Kaydet'e basar.
+      console.log("DEBUG uploadPackageFile: updatePackageDraft calling with", {
+        id: item.id,
+        bucket: ticketData.bucket,
+        path: ticketData.path,
+      });
       updatePackageDraft(item.id, {
         storage_bucket: ticketData.bucket,
         storage_path: ticketData.path,
       });
+      console.log("DEBUG uploadPackageFile: updatePackageDraft called, packageDirtyMap should have", item.id, "set to true");
 
       setSelectedFiles((old) => ({ ...old, [item.id]: null }));
       setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
@@ -802,6 +808,13 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
             const hasPackageChanges = packageDirtyMap[item.id] || isPackageDraftDirty(item, draft);
+            if (item.id) {
+              console.log("DEBUG render package", item.id, {
+                packageDirtyMap: packageDirtyMap[item.id],
+                isPackageDraftDirty: isPackageDraftDirty(item, draft),
+                hasPackageChanges,
+              });
+            }
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
                 <p className="text-xs text-white/60">
