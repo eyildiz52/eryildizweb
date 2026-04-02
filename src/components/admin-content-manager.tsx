@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AdminVideo = {
   id: string;
@@ -21,6 +22,8 @@ type AdminPackage = {
   package_type: "demo" | "paid";
   price: number;
   currency: string;
+  storage_bucket: string;
+  storage_path: string;
   demo_url: string | null;
   is_active: boolean;
   created_at: string;
@@ -64,11 +67,14 @@ type DraftVideo = {
 };
 
 type DraftPackage = {
+  package_type: "demo" | "paid";
   title: string;
   short_description: string;
   long_description: string;
   price: string;
   currency: string;
+  storage_bucket: string;
+  storage_path: string;
   demo_url: string;
   is_active: boolean;
 };
@@ -93,11 +99,14 @@ function toDraftVideo(video: AdminVideo): DraftVideo {
 
 function toDraftPackage(item: AdminPackage): DraftPackage {
   return {
+    package_type: item.package_type,
     title: item.title,
     short_description: item.short_description,
     long_description: item.long_description ?? "",
     price: String(item.price),
     currency: item.currency,
+    storage_bucket: item.storage_bucket,
+    storage_path: item.storage_path,
     demo_url: item.demo_url ?? "",
     is_active: item.is_active,
   };
@@ -113,6 +122,22 @@ function toDraftUser(user: AdminUser): DraftUser {
   };
 }
 
+function isPackageDraftDirty(item: AdminPackage, draft: DraftPackage) {
+  const original = toDraftPackage(item);
+  return (
+    original.package_type !== draft.package_type ||
+    original.title !== draft.title ||
+    original.short_description !== draft.short_description ||
+    original.long_description !== draft.long_description ||
+    original.price !== draft.price ||
+    original.currency !== draft.currency ||
+    original.storage_bucket !== draft.storage_bucket ||
+    original.storage_path !== draft.storage_path ||
+    original.demo_url !== draft.demo_url ||
+    original.is_active !== draft.is_active
+  );
+}
+
 function getOrderStatusLabel(status: AdminOrder["payment_status"]) {
   if (status === "pending") return "Odeme Bekleniyor";
   if (status === "paid") return "Odeme Onaylandi";
@@ -125,6 +150,10 @@ function getOrderStatusClass(status: AdminOrder["payment_status"]) {
   if (status === "paid") return "border-emerald-300/40 bg-emerald-500/15 text-emerald-100";
   if (status === "failed") return "border-rose-300/40 bg-rose-500/15 text-rose-100";
   return "border-slate-300/40 bg-slate-500/15 text-slate-100";
+}
+
+function getPackageTypeLabel(type: "demo" | "paid") {
+  return type === "paid" ? "Ucretli Paket" : "Demo Paket";
 }
 
 export function AdminContentManager({ initialVideos, initialPackages, initialUsers, initialOrders }: Props) {
@@ -161,6 +190,8 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
   const [showNewUser, setShowNewUser] = useState(false);
   const [busyKey, setBusyKey] = useState<string>("");
   const [message, setMessage] = useState<string>("");
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
+  const [fileInputKeys, setFileInputKeys] = useState<Record<string, number>>({});
 
   const publishedCount = useMemo(
     () => videos.filter((item) => item.is_published).length,
@@ -372,25 +403,168 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id,
+          packageType: draft.package_type,
           title: draft.title,
           shortDescription: draft.short_description,
           longDescription: draft.long_description,
           price: Number(draft.price),
           currency: draft.currency,
+          storageBucket: draft.storage_bucket,
+          storagePath: draft.storage_path,
           demoUrl: draft.demo_url,
           isActive: draft.is_active,
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") ?? "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: `Sunucu beklenmeyen bir yanit dondurdu. HTTP ${res.status}` };
+
       if (!res.ok) {
-        throw new Error(data.error ?? "Paket guncellenemedi.");
+        throw new Error(data.error ?? `Paket guncellenemedi. HTTP ${res.status}`);
       }
 
       await refreshPackages();
       writeMessage("Paket guncellendi.");
     } catch (error) {
       writeMessage(error instanceof Error ? error.message : "Paket guncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const uploadPackageFile = async (item: AdminPackage) => {
+    const file = selectedFiles[item.id];
+    if (!file) {
+      writeMessage("Once yüklenecek dosyayi secin.");
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      writeMessage("Supabase browser ayarlari eksik.");
+      return;
+    }
+
+    setBusyKey(`upload-${item.id}`);
+
+    try {
+      const ticketRes = await fetch("/api/admin/packages/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packageId: item.id,
+          fileName: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+        }),
+      });
+
+      const ticketData = await ticketRes.json();
+      if (!ticketRes.ok) {
+        throw new Error(ticketData.error ?? "Upload izni alinamadi.");
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from(ticketData.bucket)
+        .uploadToSignedUrl(ticketData.path, ticketData.token, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      const saveRes = await fetch("/api/admin/packages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          storageBucket: ticketData.bucket,
+          storagePath: ticketData.path,
+        }),
+      });
+
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        throw new Error(saveData.error ?? "Paket storage yolu guncellenemedi.");
+      }
+
+      setPackages((old) =>
+        old.map((pkg) =>
+          pkg.id === item.id
+            ? {
+                ...pkg,
+                storage_bucket: ticketData.bucket,
+                storage_path: ticketData.path,
+              }
+            : pkg
+        )
+      );
+      setPackageDrafts((old) => ({
+        ...old,
+        [item.id]: {
+          ...(old[item.id] ?? toDraftPackage(item)),
+          storage_bucket: ticketData.bucket,
+          storage_path: ticketData.path,
+        },
+      }));
+
+      setSelectedFiles((old) => ({ ...old, [item.id]: null }));
+      setFileInputKeys((old) => ({ ...old, [item.id]: (old[item.id] ?? 0) + 1 }));
+      writeMessage("Dosya yüklendi ve paket indirme yolu guncellendi.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Dosya yuklenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const deletePackageFile = async (item: AdminPackage) => {
+    const draft = packageDrafts[item.id] ?? toDraftPackage(item);
+    const targetPath = `${draft.storage_bucket}/${draft.storage_path}`;
+
+    if (!window.confirm(`Bu storage dosyasini silmek istediginize emin misiniz?\n${targetPath}`)) {
+      return;
+    }
+
+    setBusyKey(`delete-upload-${item.id}`);
+
+    try {
+      const res = await fetch("/api/admin/packages/upload", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageId: item.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Storage dosyasi silinemedi.");
+      }
+
+      setPackages((old) =>
+        old.map((pkg) =>
+          pkg.id === item.id
+            ? {
+                ...pkg,
+                storage_path: "",
+              }
+            : pkg
+        )
+      );
+      setPackageDrafts((old) => ({
+        ...old,
+        [item.id]: {
+          ...(old[item.id] ?? toDraftPackage(item)),
+          storage_path: "",
+        },
+      }));
+
+      writeMessage("Storage dosyasi silindi. Isterseniz simdi dogru dosyayi yukleyebilirsiniz.");
+    } catch (error) {
+      writeMessage(error instanceof Error ? error.message : "Storage dosyasi silinemedi.");
     } finally {
       setBusyKey("");
     }
@@ -628,10 +802,31 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
         <div className="mt-4 space-y-4">
           {packages.map((item) => {
             const draft = packageDrafts[item.id] ?? toDraftPackage(item);
+            const hasPackageChanges = isPackageDraftDirty(item, draft);
             return (
               <article key={item.id} className="rounded-xl border border-white/15 bg-white/5 p-4">
-                <p className="text-xs text-white/60">{item.slug} • {item.package_type.toUpperCase()}</p>
+                <p className="text-xs text-white/60">
+                  {draft.title} • {getPackageTypeLabel(draft.package_type)}
+                </p>
+                <p className="mt-1 text-[11px] text-white/45">Slug: {item.slug}</p>
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <select
+                    aria-label={`${item.slug} paket tipi`}
+                    value={draft.package_type}
+                    onChange={(event) =>
+                      setPackageDrafts((old) => ({
+                        ...old,
+                        [item.id]: {
+                          ...draft,
+                          package_type: event.target.value === "paid" ? "paid" : "demo",
+                        },
+                      }))
+                    }
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                  >
+                    <option value="paid" className="bg-[#08111f] text-white">Ucretli Paket</option>
+                    <option value="demo" className="bg-[#08111f] text-white">Demo Paket</option>
+                  </select>
                   <input
                     aria-label={`${item.slug} paket basligi`}
                     value={draft.title}
@@ -689,6 +884,30 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
                   <input
+                    aria-label={`${item.slug} storage bucket`}
+                    value={draft.storage_bucket}
+                    onChange={(event) =>
+                      setPackageDrafts((old) => ({
+                        ...old,
+                        [item.id]: { ...draft, storage_bucket: event.target.value },
+                      }))
+                    }
+                    placeholder="Storage Bucket"
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                  />
+                  <input
+                    aria-label={`${item.slug} storage path`}
+                    value={draft.storage_path}
+                    onChange={(event) =>
+                      setPackageDrafts((old) => ({
+                        ...old,
+                        [item.id]: { ...draft, storage_path: event.target.value },
+                      }))
+                    }
+                    placeholder="Storage Path"
+                    className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
+                  />
+                  <input
                     value={draft.demo_url}
                     onChange={(event) =>
                       setPackageDrafts((old) => ({
@@ -699,6 +918,43 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                     placeholder="Demo URL"
                     className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none"
                   />
+                </div>
+                <div className="mt-3 rounded-xl border border-white/10 bg-[#08111f]/50 p-3">
+                  <p className="text-xs text-white/60">Mevcut Indirme Dosyasi</p>
+                  <p className="mt-1 break-all text-sm text-white/85">
+                    {draft.storage_bucket}/{draft.storage_path}
+                  </p>
+                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+                    <input
+                      key={fileInputKeys[item.id] ?? 0}
+                      type="file"
+                      aria-label={`${item.slug} dosya yukleme`}
+                      onChange={(event) =>
+                        setSelectedFiles((old) => ({
+                          ...old,
+                          [item.id]: event.target.files?.[0] ?? null,
+                        }))
+                      }
+                      className="block w-full text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#ffd166] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#1f2937]"
+                    />
+                    <button
+                      onClick={() => uploadPackageFile(item)}
+                      disabled={busyKey === `upload-${item.id}`}
+                      className="rounded-full border border-[#f8b84e]/35 bg-[#f8b84e]/12 px-4 py-2 text-sm font-semibold text-[#ffe0a5] disabled:opacity-60"
+                    >
+                      {busyKey === `upload-${item.id}` ? "Yukleniyor..." : "Dosyayi Storage'a Yukle"}
+                    </button>
+                    <button
+                      onClick={() => deletePackageFile(item)}
+                      disabled={busyKey === `delete-upload-${item.id}`}
+                      className="rounded-full border border-red-300/45 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 disabled:opacity-60"
+                    >
+                      {busyKey === `delete-upload-${item.id}` ? "Siliniyor..." : "Mevcut Dosyayi Sil"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs leading-6 text-white/65">
+                    Dosya tarayicidan dogrudan Supabase Storage&apos;a gider. Yukleme bitince paketin indirme yolu otomatik guncellenir.
+                  </p>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <label className="inline-flex items-center gap-2 text-xs text-white/80">
@@ -716,7 +972,7 @@ export function AdminContentManager({ initialVideos, initialPackages, initialUse
                   </label>
                   <button
                     onClick={() => savePackage(item.id)}
-                    disabled={busyKey === `package-${item.id}`}
+                    disabled={busyKey === `package-${item.id}` || !hasPackageChanges}
                     className="rounded-full bg-[#ffd166] px-4 py-1.5 text-xs font-semibold text-[#1f2937] disabled:opacity-60"
                   >
                     Kaydet
